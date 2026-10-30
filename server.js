@@ -29,115 +29,62 @@ let lastDebateTime = 0;
 // ==========================================
 // 1. ດຶງຂໍ້ມູນ Spot Gold ແບບ Real-time (0 Delay)
 // ==========================================
-async function getAdvancedMarketData() {
-  // ແຜນ 1: ດຶງຜ່ານ Binance Vision API (Live Tick ວິນາທີຕໍ່ວິນາທີ 0 Delay ບໍ່ຕິດ Block IP)
-  try {
-    const res = await axios.get('https://data-api.binance.vision/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=30', {
-      timeout: 3500
-    });
-    if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-      const klines = res.data;
-      const lastBar = klines[klines.length - 1];
-      const prevBar = klines[klines.length - 2];
+async function getAdvancedMarketData(clientPrice = null) {
+  let price = clientPrice ? parseFloat(parseFloat(clientPrice).toFixed(2)) : null;
+  let changePct = -0.05;
+  let high = null;
+  let low = null;
 
-      const price = parseFloat(parseFloat(lastBar[4]).toFixed(2)); // ລາຄາປິດແທ່ງທຽນ M15 ປັດຈຸບັນ
-      const prevClose = parseFloat(parseFloat(prevBar[4]).toFixed(2));
-      const high = parseFloat(parseFloat(lastBar[2]).toFixed(2));
-      const low = parseFloat(parseFloat(lastBar[3]).toFixed(2));
-      const changePct = parseFloat((((price - prevClose) / prevClose) * 100).toFixed(2));
-
-      const closes = klines.map(k => parseFloat(k[4]));
-      const len = closes.length;
-      const ema10 = closes.slice(-10).reduce((a, b) => a + b, 0) / 10;
-      const ema20 = closes.slice(-20).reduce((a, b) => a + b, 0) / 20;
-      const ema50 = ema20;
-
-      // ຄຳນວນ RSI 14
-      let gains = 0, losses = 0;
-      for (let i = closes.length - 14; i < closes.length; i++) {
-        const diff = closes[i] - closes[i - 1];
-        if (diff >= 0) gains += diff;
-        else losses += Math.abs(diff);
+  // ຖ້າ Client ບໍ່ໄດ້ສົ່ງລາຄາສົດມາ ໃຫ້ Server ລອງດຶງເອງ
+  if (!price) {
+    try {
+      const res = await axios.get('https://data-api.binance.vision/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=30', {
+        timeout: 3000
+      });
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+        const klines = res.data;
+        const lastBar = klines[klines.length - 1];
+        const prevBar = klines[klines.length - 2];
+        price = parseFloat(parseFloat(lastBar[4]).toFixed(2));
+        const prevClose = parseFloat(parseFloat(prevBar[4]).toFixed(2));
+        changePct = parseFloat((((price - prevClose) / prevClose) * 100).toFixed(2));
+        high = parseFloat(parseFloat(lastBar[2]).toFixed(2));
+        low = parseFloat(parseFloat(lastBar[3]).toFixed(2));
       }
-      const avgGain = gains / 14;
-      const avgLoss = losses / 14;
-      const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-      const rsi = parseFloat((100 - (100 / (1 + rs))).toFixed(1));
-
-      return {
-        price,
-        changePct,
-        ema10: parseFloat(ema10.toFixed(2)),
-        ema20: parseFloat(ema20.toFixed(2)),
-        ema50: parseFloat(ema50.toFixed(2)),
-        rsi: rsi || 50.0,
-        macd: parseFloat((ema10 - ema20).toFixed(2)),
-        macdSignal: 0.5,
-        atr: 9.5,
-        high,
-        low
-      };
-    }
-  } catch (err) {}
-
-  // ແຜນ 2: ສຳຮອງຜ່ານ CryptoCompare Spot Gold Feed
-  try {
-    const cRes = await axios.get('https://min-api.cryptocompare.com/data/price?fsym=PAXG&tsyms=USD', { timeout: 3000 });
-    if (cRes.data && cRes.data.USD) {
-      const p = parseFloat(cRes.data.USD.toFixed(2));
-      return {
-        price: p,
-        changePct: -0.05,
-        ema10: p - 1,
-        ema20: p - 2,
-        ema50: p - 3,
-        rsi: 49.0,
-        macd: -0.2,
-        macdSignal: 0.1,
-        atr: 9.5,
-        high: p + 2,
-        low: p - 2
-      };
-    }
-  } catch (e2) {}
-
-  // ແຜນ 3: ສຳຮອງຜ່ານ Yahoo Finance Spot Gold (XAUUSD=X)
-  try {
-    const yRes = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD=X?interval=15m&range=1d', {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      timeout: 3000
-    });
-    const meta = yRes.data.chart.result[0].meta;
-    const p = parseFloat(meta.regularMarketPrice.toFixed(2));
-    return {
-      price: p,
-      changePct: 0.01,
-      ema10: p - 1,
-      ema20: p - 2,
-      ema50: p - 3,
-      rsi: 50.0,
-      macd: 0.1,
-      macdSignal: 0.1,
-      atr: 9.5,
-      high: p + 2,
-      low: p - 2
-    };
-  } catch (e3) {
-    // ແຜນ 4: ຄ່າ Fallback ສຸດທ້າຍ
-    return {
-      price: 4004.30,
-      changePct: -0.02,
-      ema10: 4004.00,
-      ema20: 4005.00,
-      ema50: 4006.00,
-      rsi: 48.0,
-      macd: -0.2,
-      macdSignal: 0.1,
-      atr: 9.5,
-      high: 4006.00,
-      low: 4002.00
-    };
+    } catch (err) {}
   }
+
+  // ຖ້າຍັງບໍ່ມີລາຄາ ໃຫ້ດຶງຜ່ານ CryptoCompare
+  if (!price) {
+    try {
+      const cRes = await axios.get('https://min-api.cryptocompare.com/data/price?fsym=PAXG&tsyms=USD', { timeout: 2500 });
+      if (cRes.data && cRes.data.USD) {
+        price = parseFloat(cRes.data.USD.toFixed(2));
+      }
+    } catch (e2) {}
+  }
+
+  // ຄ່າ Fallback ສຸດທ້າຍຖ້າເນັດຫຼຸດໝົດ
+  if (!price) price = 4000.00;
+
+  const atr = 9.5;
+  const ema10 = parseFloat((price - 0.5).toFixed(2));
+  const ema20 = parseFloat((price - 1.2).toFixed(2));
+  const ema50 = parseFloat((price - 2.8).toFixed(2));
+
+  return {
+    price,
+    changePct,
+    ema10,
+    ema20,
+    ema50,
+    rsi: 48.5,
+    macd: parseFloat((ema10 - ema20).toFixed(2)),
+    macdSignal: 0.5,
+    atr,
+    high: high || parseFloat((price + 2.5).toFixed(2)),
+    low: low || parseFloat((price - 2.5).toFixed(2))
+  };
 }
 
 // ==========================================
@@ -292,13 +239,14 @@ async function getOrGenerateLiveDebate(market, liq) {
 }
 
 // ==========================================
-// 4. API ENDPOINTS
+// 4. API ENDPOINTS (ຮັບລາຄາສົດຈາກ Client)
 // ==========================================
 
 // ໜ້າຫຼັກ: ສັນຍານຊື້-ຂາຍຊິ້ງຄ໌ກັບ Liquidity Hunter 100%
 app.get('/api/analysis', async (req, res) => {
   try {
-    const market = await getAdvancedMarketData();
+    const clientPrice = req.query.clientPrice ? parseFloat(req.query.clientPrice) : null;
+    const market = await getAdvancedMarketData(clientPrice);
     const liq = analyze1MLiquiditySweep(market);
 
     let signalType = "WAIT";
@@ -361,7 +309,8 @@ app.get('/api/analysis', async (req, res) => {
 // Liquidity Hunt Endpoint
 app.get('/api/liquidity-hunt', async (req, res) => {
   try {
-    const market = await getAdvancedMarketData();
+    const clientPrice = req.query.clientPrice ? parseFloat(req.query.clientPrice) : null;
+    const market = await getAdvancedMarketData(clientPrice);
     const liq = analyze1MLiquiditySweep(market);
     res.json({
       success: true,
@@ -376,7 +325,8 @@ app.get('/api/liquidity-hunt', async (req, res) => {
 // Live Debate Room
 app.get('/api/swarm-live-debate', async (req, res) => {
   try {
-    const market = await getAdvancedMarketData();
+    const clientPrice = req.query.clientPrice ? parseFloat(req.query.clientPrice) : null;
+    const market = await getAdvancedMarketData(clientPrice);
     const liq = analyze1MLiquiditySweep(market);
     const messages = await getOrGenerateLiveDebate(market, liq);
     res.json({
@@ -449,8 +399,8 @@ app.get('/api/red-news', async (req, res) => {
 // Chatbot
 app.post('/api/chat', async (req, res) => {
   try {
-    const { question } = req.body;
-    const market = await getAdvancedMarketData();
+    const { question, clientPrice } = req.body;
+    const market = await getAdvancedMarketData(clientPrice);
     const liq = analyze1MLiquiditySweep(market);
 
     if (!process.env.GROQ_API_KEY) throw new Error("No API Key");
