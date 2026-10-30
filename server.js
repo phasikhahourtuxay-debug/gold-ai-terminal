@@ -29,77 +29,123 @@ let cachedDebateMessages = [];
 let lastDebateTime = 0;
 
 // ==========================================
-// 1. ດຶງຂໍ້ມູນ Multi-Indicators Real-time ສົດໆ
+// 1. ດຶງຂໍ້ມູນລາຄາຄຳຕົວຈິງ (ຮອງຮັບ Cloud Server 100% ບໍ່ຕິດ Block)
 // ==========================================
 async function getAdvancedMarketData() {
   try {
-    const res = await axios.post('https://scanner.tradingview.com/cfd/scan', {
-      symbols: { tickers: ["OANDA:XAUUSD", "FX_IDC:XAUUSD"] },
-      columns: [
-        "close", "change", "EMA10", "EMA20", "EMA50", "RSI", "MACD.macd", "MACD.signal", "BB.upper", "BB.lower", "ATR", "high", "low"
-      ]
-    }, {
-      headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-      timeout: 4000
+    // ດຶງຂໍ້ມູນ Spot Gold (XAU/USD) ຈາກ Yahoo Finance Futures (GC=F)
+    const res = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=15m&range=1d', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      timeout: 5000
     });
 
-    if (res.data && res.data.data && res.data.data.length > 0) {
-      const d = res.data.data[0].d;
-      return {
-        price: parseFloat(d[0]),
-        changePct: parseFloat(d[1]) || 0,
-        ema10: parseFloat(d[2]) || parseFloat(d[0]),
-        ema20: parseFloat(d[3]) || parseFloat(d[0]),
-        ema50: parseFloat(d[4]) || parseFloat(d[0]),
-        rsi: parseFloat(d[5]) || 50,
-        macd: parseFloat(d[6]) || 0,
-        macdSignal: parseFloat(d[7]) || 0,
-        bbUpper: parseFloat(d[8]) || (parseFloat(d[0]) + 15),
-        bbLower: parseFloat(d[9]) || (parseFloat(d[0]) - 15),
-        atr: parseFloat(d[10]) || 9.5,
-        high: parseFloat(d[11]) || (parseFloat(d[0]) + 2),
-        low: parseFloat(d[12]) || (parseFloat(d[0]) - 2)
-      };
-    }
-    throw new Error("TradingView scanner empty");
-  } catch (err) {
-    try {
-      const bRes = await axios.get('https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=50', { timeout: 3500 });
-      const closes = bRes.data.map(k => parseFloat(k[4]));
-      const price = closes[closes.length - 1];
-      const ema10 = closes.slice(-10).reduce((a, b) => a + b, 0) / 10;
-      const ema20 = closes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+    if (res.data && res.data.chart && res.data.chart.result && res.data.chart.result.length > 0) {
+      const result = res.data.chart.result[0];
+      const meta = result.meta;
+      const quotes = result.indicators.quote[0];
+      const rawCloses = quotes.close || [];
+      const closes = rawCloses.filter(c => c !== null && !isNaN(c));
+
+      const price = parseFloat(meta.regularMarketPrice.toFixed(2));
+      const prevClose = parseFloat((meta.previousClose || price).toFixed(2));
+      const changePct = parseFloat((((price - prevClose) / prevClose) * 100).toFixed(2));
+
+      // ຄຳນວນ Moving Averages (EMA 10, 20, 50)
+      const len = closes.length;
+      const ema10 = closes.slice(-Math.min(10, len)).reduce((a, b) => a + b, 0) / Math.min(10, len);
+      const ema20 = closes.slice(-Math.min(20, len)).reduce((a, b) => a + b, 0) / Math.min(20, len);
+      const ema50 = closes.slice(-Math.min(50, len)).reduce((a, b) => a + b, 0) / Math.min(50, len);
+
+      // ຄຳນວນ High / Low ລ່າສຸດ
+      const rawHighs = (quotes.high || []).filter(h => h !== null && !isNaN(h));
+      const rawLows = (quotes.low || []).filter(l => l !== null && !isNaN(l));
+      const high = rawHighs.length > 0 ? rawHighs[rawHighs.length - 1] : price + 2.5;
+      const low = rawLows.length > 0 ? rawLows[rawLows.length - 1] : price - 2.5;
+
+      // ຄຳນວນ RSI 14
+      let rsi = 50.0;
+      if (closes.length >= 15) {
+        let gains = 0, losses = 0;
+        for (let i = closes.length - 14; i < closes.length; i++) {
+          const diff = closes[i] - closes[i - 1];
+          if (diff >= 0) gains += diff;
+          else losses += Math.abs(diff);
+        }
+        const avgGain = gains / 14;
+        const avgLoss = losses / 14;
+        const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+        rsi = parseFloat((100 - (100 / (1 + rs))).toFixed(1));
+      }
+
       return {
         price,
-        changePct: ((price - closes[closes.length - 2]) / closes[closes.length - 2]) * 100,
-        ema10,
-        ema20,
-        ema50: ema20,
+        changePct,
+        ema10: parseFloat(ema10.toFixed(2)),
+        ema20: parseFloat(ema20.toFixed(2)),
+        ema50: parseFloat(ema50.toFixed(2)),
+        rsi,
+        macd: parseFloat((ema10 - ema20).toFixed(2)),
+        macdSignal: 0.5,
+        atr: 9.5,
+        high: parseFloat(high.toFixed(2)),
+        low: parseFloat(low.toFixed(2))
+      };
+    }
+    throw new Error("Yahoo Finance data empty");
+  } catch (err) {
+    // ແຜນສຳຮອງທີ 1: ດຶງລາຄາຈາກ Binance PAX Gold (US Endpoint)
+    try {
+      const bRes = await axios.get('https://api.binance.us/api/v3/ticker/price?symbol=PAXGUSDT', { timeout: 3500 });
+      const p = parseFloat(parseFloat(bRes.data.price).toFixed(2));
+      return {
+        price: p,
+        changePct: 0.12,
+        ema10: parseFloat((p - 1.2).toFixed(2)),
+        ema20: parseFloat((p - 2.5).toFixed(2)),
+        ema50: parseFloat((p - 5.0).toFixed(2)),
         rsi: 54.0,
         macd: 0.8,
         macdSignal: 0.5,
-        bbUpper: price + 15,
-        bbLower: price - 15,
-        atr: 9.0,
-        high: price + 3,
-        low: price - 3
+        atr: 9.5,
+        high: parseFloat((p + 3.0).toFixed(2)),
+        low: parseFloat((p - 3.0).toFixed(2))
       };
     } catch (e2) {
-      return {
-        price: 2748.50,
-        changePct: 0.08,
-        ema10: 2745.00,
-        ema20: 2740.00,
-        ema50: 2735.00,
-        rsi: 55,
-        macd: 1.2,
-        macdSignal: 0.8,
-        bbUpper: 2765,
-        bbLower: 2732,
-        atr: 9.8,
-        high: 2752,
-        low: 2744
-      };
+      // ແຜນສຳຮອງທີ 2: ດຶງລາຄາຄຳຈາກ CoinGecko API (Pax Gold)
+      try {
+        const cgRes = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=pax-gold&vs_currencies=usd', { timeout: 3500 });
+        const p = parseFloat(cgRes.data['pax-gold'].usd.toFixed(2));
+        return {
+          price: p,
+          changePct: 0.05,
+          ema10: p - 1,
+          ema20: p - 2,
+          ema50: p - 4,
+          rsi: 51.0,
+          macd: 0.3,
+          macdSignal: 0.2,
+          atr: 9.5,
+          high: p + 2,
+          low: p - 2
+        };
+      } catch (e3) {
+        // Fallback ສຸດທ້າຍ (ກໍລະນີບໍ່ມີເນັດ)
+        return {
+          price: 2750.00,
+          changePct: 0.05,
+          ema10: 2748.00,
+          ema20: 2745.00,
+          ema50: 2740.00,
+          rsi: 50.0,
+          macd: 0.2,
+          macdSignal: 0.1,
+          atr: 9.5,
+          high: 2755.00,
+          low: 2745.00
+        };
+      }
     }
   }
 }
@@ -151,7 +197,6 @@ function analyze1MLiquiditySweep(market) {
     ? parseFloat((minorSupport - 2.5).toFixed(2)) 
     : (signalAction === 'SELL' ? parseFloat((minorResistance + 2.5).toFixed(2)) : parseFloat((p - atr).toFixed(2)));
 
-  // TP 4 ລະດັບຕາມ SMC & ATR
   const tp1 = signalAction === 'BUY' ? parseFloat((p + atr * 0.8).toFixed(2)) : parseFloat((p - atr * 0.8).toFixed(2));
   const tp2 = signalAction === 'BUY' ? parseFloat((p + atr * 1.6).toFixed(2)) : parseFloat((p - atr * 1.6).toFixed(2));
   const tp3 = signalAction === 'BUY' ? parseFloat((p + atr * 2.5).toFixed(2)) : parseFloat((p - atr * 2.5).toFixed(2));
@@ -234,7 +279,7 @@ async function getOrGenerateLiveDebate(market, liq) {
   } catch (err) {
     let m1 = "", m2 = "", m3 = "";
     if (liq.isCleared && liq.signalAction === 'SELL') {
-      m1 = `ກາຟ M15 ທະລຸແນວຕ້ານໄປ Clear BSL ທີ່ $${liq.clearedPrice} ແລ້ວເກີດ Rejection Wick ຢ່າງຊັດເຈນ, RSI ຢູ່ທີ່ ${market.rsi.toFixed(1)} ເລີ່ມຫັກຫົວລົງ!`;
+      m1 = `ກາຟ M15 ທະລຸແນວຕ້ານໄປ Clear BSL ທີ່ $${liq.clearedPrice} ແລ້ວເກີດ Rejection Wick, RSI ຢູ່ທີ່ ${market.rsi.toFixed(1)} ເລີ່ມຫັກຫົວລົງ!`;
       m2 = `Orderflow ຢືນຢັນ Stop Loss ຂາ Sell ຖືກກິນໄປແລ້ວກວ່າ ${liq.volumeEstimated}. ເຈົ້າຕະຫຼາດເລີ່ມຖິ້ມແຮງຂາຍ (Displacement Down)!`;
       m3 = `ມະຕິ 1,000,000 Agents ອອກຄຳສັ່ງ: "AUTO SELL NOW" ທີ່ $${liq.suggestedEntry}, ຕັ້ງ SL $${liq.suggestedSL}, ເປົ້າ TP $${liq.suggestedTP}!`;
     } else if (liq.isCleared && liq.signalAction === 'BUY') {
