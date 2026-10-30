@@ -35,8 +35,8 @@
 </head>
 <body class="p-3 md:p-6">
 
-    <!-- Audio Element ສຳລັບຫຼິ້ນເພງແຈ້ງເຕືອນ -->
-    <audio id="audio-alert-player" loop preload="auto"></audio>
+    <!-- Audio Element ດຶງໄຟລ໌ alert.mp3 ທີ່ຢູ່ໃນ GitHub ແບບຖາວອນ -->
+    <audio id="audio-alert-player" src="/alert.mp3" loop preload="auto"></audio>
 
     <!-- Header & AI Swarm Status -->
     <header class="flex flex-wrap justify-between items-center bg-gray-900 border-2 border-yellow-500/40 p-4 md:p-5 rounded-2xl mb-4 glow-gold">
@@ -48,17 +48,17 @@
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-3 mt-3 md:mt-0 text-xs md:text-sm">
-            <!-- ປຸ່ມເລືອກເພງຂອງຕົວເອງ -->
+            <!-- ປຸ່ມເລືອກເພງ ແລະ ສະແດງສະຖານະເພງຖາວອນ -->
             <div class="bg-gray-800 px-3 py-1.5 rounded-xl border border-gray-700 flex items-center gap-2">
                 <i class="fa-solid fa-music text-purple-400"></i>
                 <label for="custom-audio-file" class="cursor-pointer text-xs text-yellow-300 hover:text-white underline">
-                    ເລືອກເພງແຈ້ງເຕືອນ (MP3)
+                    ປ່ຽນເພງແຈ້ງເຕືອນ (MP3)
                 </label>
                 <input type="file" id="custom-audio-file" accept="audio/*" class="hidden" onchange="loadCustomAudio(event)">
-                <span id="audio-name-badge" class="text-[11px] text-gray-400 max-w-[100px] truncate">(Default Siren)</span>
+                <span id="audio-name-badge" class="text-[11px] text-emerald-400 font-bold max-w-[120px] truncate">(alert.mp3 ຖາວອນ)</span>
             </div>
 
-            <!-- ກ່ອງນັບຖອຍຫຼັງສຽງເຕືອນ 5 ນາທີ -->
+            <!-- ກ່ອງນັບຖອຍຫຼັງສຽງເຕືອນ 5 ນາທີ & ປຸ່ມປິດສຽງ -->
             <div id="sound-timer-badge" class="hidden bg-red-950/80 border border-red-500/60 px-3 py-1.5 rounded-xl flex items-center gap-2">
                 <i class="fa-solid fa-volume-high text-red-400 animate-bounce"></i>
                 <span class="text-xs text-red-300 font-mono">ສຽງເຕືອນ: <b id="sound-timer-countdown">05:00</b></span>
@@ -115,7 +115,7 @@
                     <span class="text-sm md:text-base font-bold text-yellow-400 flex items-center gap-2">
                         <i class="fa-solid fa-chart-line"></i> ກາຟທອງຄຳປະຈຸບັນ XAU/USD (Live Feed M15)
                     </span>
-                    <!-- ປ່ອງສະແດງລາຄາສົດ OANDA:XAUUSD 100% ຕົງກັບແທ່ງທຽນເປະໆ -->
+                    <!-- ປ່ອງສະແດງລາຄາສົດ OANDA:XAUUSD 100% ຕົງກັບແທ່ງທຽນ -->
                     <div class="flex items-center gap-2 bg-gray-800/90 border border-yellow-500/40 px-3 py-1 rounded-xl">
                         <span class="text-xs text-yellow-400 font-mono">OANDA Live:</span>
                         <iframe 
@@ -422,9 +422,9 @@
         let activeTab = 'main';
 
         // ==========================================
-        // ລະບົບສຽງແຈ້ງເຕືອນ 5 ນາທີ + ເລືອກເພງເອງໄດ້
+        // ລະບົບສຽງແຈ້ງເຕືອນ 5 ນາທີ (ດຶງ alert.mp3 ຖາວອນ)
         // ==========================================
-        let customAudioUrl = null;
+        let customAudioUrl = "/alert.mp3"; // ຕັ້ງ alert.mp3 ເປັນເພງຫຼັກຖາວອນ
         let isSoundPlaying = false;
         let soundTimerInterval = null;
         let soundTimeRemaining = 300;
@@ -433,12 +433,12 @@
         function loadCustomAudio(event) {
             const file = event.target.files[0];
             if (file) {
-                if (customAudioUrl) URL.revokeObjectURL(customAudioUrl);
+                if (customAudioUrl && customAudioUrl !== "/alert.mp3") URL.revokeObjectURL(customAudioUrl);
                 customAudioUrl = URL.createObjectURL(file);
                 const player = document.getElementById('audio-alert-player');
                 player.src = customAudioUrl;
                 document.getElementById('audio-name-badge').innerText = `(${file.name.substring(0, 10)}...)`;
-                alert(`ເລືອກເພງແຈ້ງເຕືອນສຳເລັດ: ${file.name}`);
+                alert(`ປ່ຽນເພງແຈ້ງເຕືອນຊົ່ວຄາວສຳເລັດ: ${file.name}`);
             }
         }
 
@@ -461,23 +461,24 @@
         function start5MinuteAlertSound() {
             if (isSoundPlaying) return;
             isSoundPlaying = true;
-            soundTimeRemaining = 300;
+            soundTimeRemaining = 300; // 5 ນາທີ = 300 ວິນາທີ
 
             const badge = document.getElementById('sound-timer-badge');
             const countdownEl = document.getElementById('sound-timer-countdown');
             badge.classList.remove('hidden');
 
             const player = document.getElementById('audio-alert-player');
-            if (customAudioUrl) {
-                player.currentTime = 0;
-                player.play().catch(e => console.log("Audio play error:", e));
-            }
+            player.currentTime = 0;
+            player.play().catch(e => {
+                console.log("Custom audio error, fallback synth:", e);
+            });
 
             clearInterval(soundTimerInterval);
             soundTimerInterval = setInterval(() => {
                 soundTimeRemaining--;
 
-                if (!customAudioUrl && soundTimeRemaining % 2 === 0) {
+                // ຖ້າໄຟລ໌ເພງຫຼິ້ນບໍ່ໄດ້ ໃຫ້ຍິງສຽງ Siren ສັງເຄາະສຳຮອງ
+                if (player.paused && soundTimeRemaining % 2 === 0) {
                     playFallbackSynthSiren();
                 }
 
