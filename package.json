@@ -1,0 +1,16 @@
+{
+  "name": "gold-ai-swarm-terminal",
+  "version": "1.0.0",
+  "description": "Gold XAU/USD AI Liquidity Hunter Terminal",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "openai": "^4.33.0"
+  }
+}

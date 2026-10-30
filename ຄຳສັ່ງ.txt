@@ -1,0 +1,12 @@
+ໃຫ້ຕິດຕັ້ງໂປຮແກມnode
+C:\Users\IT005\Desktop\gold-ai-terminal
+==>cmd
+
+==>Typeຄັ້ງດຽວ
+==>npm install
+==>ທຸກໆຄັ້ງແລະກໍ່ບໍ່ຕ້ອງປິດcmdຈົນກວ່າຈະຢຸດໃຊ້ງານ
+==>node server.js
+
+==>ຈາກນັ້ນໃຫ້Double click index.html
+
+
