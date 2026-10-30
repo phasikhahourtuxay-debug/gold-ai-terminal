@@ -35,7 +35,7 @@
 </head>
 <body class="p-3 md:p-6">
 
-    <!-- Audio Element ສຳລັບຫຼິ້ນເພງແຈ້ງເຕືອນ (Custom Sound) -->
+    <!-- Audio Element ສຳລັບຫຼິ້ນເພງແຈ້ງເຕືອນ -->
     <audio id="audio-alert-player" loop preload="auto"></audio>
 
     <!-- Header & AI Swarm Status -->
@@ -48,7 +48,7 @@
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-3 mt-3 md:mt-0 text-xs md:text-sm">
-            <!-- ປຸ່ມເລືອກເພງຂອງຕົວເອງ & ສະຖານະສຽງ 5 ນາທີ -->
+            <!-- ປຸ່ມເລືອກເພງຂອງຕົວເອງ -->
             <div class="bg-gray-800 px-3 py-1.5 rounded-xl border border-gray-700 flex items-center gap-2">
                 <i class="fa-solid fa-music text-purple-400"></i>
                 <label for="custom-audio-file" class="cursor-pointer text-xs text-yellow-300 hover:text-white underline">
@@ -58,7 +58,7 @@
                 <span id="audio-name-badge" class="text-[11px] text-gray-400 max-w-[100px] truncate">(Default Siren)</span>
             </div>
 
-            <!-- ກ່ອງນັບຖອຍຫຼັງສຽງເຕືອນ 5 ນາທີ & ປຸ່ມປິດສຽງ -->
+            <!-- ກ່ອງນັບຖອຍຫຼັງສຽງເຕືອນ 5 ນາທີ -->
             <div id="sound-timer-badge" class="hidden bg-red-950/80 border border-red-500/60 px-3 py-1.5 rounded-xl flex items-center gap-2">
                 <i class="fa-solid fa-volume-high text-red-400 animate-bounce"></i>
                 <span class="text-xs text-red-300 font-mono">ສຽງເຕືອນ: <b id="sound-timer-countdown">05:00</b></span>
@@ -110,16 +110,19 @@
     <main id="view-main" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div class="lg:col-span-8 space-y-6">
             <!-- Real-time Chart -->
-            <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden p-4 h-[540px] flex flex-col">
-                <div class="flex justify-between items-center mb-3 px-1">
+            <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden p-4 h-[570px] flex flex-col">
+                <div class="flex flex-wrap justify-between items-center mb-3 px-1 gap-2">
                     <span class="text-sm md:text-base font-bold text-yellow-400 flex items-center gap-2">
                         <i class="fa-solid fa-chart-line"></i> ກາຟທອງຄຳປະຈຸບັນ XAU/USD (Live Feed M15)
                     </span>
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs md:text-sm font-mono text-yellow-300 bg-gray-800 px-3 py-1 rounded-lg border border-yellow-500/30">
-                            Live Price: <b id="live-price-indicator" class="text-white text-base">ກຳລັງຊິ້ງຄ໌...</b>
-                        </span>
-                        <span class="text-xs bg-yellow-500/20 text-yellow-400 px-2.5 py-0.5 rounded-full">0 Delay Synced</span>
+                    <!-- ປ່ອງສະແດງລາຄາສົດ OANDA:XAUUSD 100% ຕົງກັບແທ່ງທຽນເປະໆ -->
+                    <div class="flex items-center gap-2 bg-gray-800/90 border border-yellow-500/40 px-3 py-1 rounded-xl">
+                        <span class="text-xs text-yellow-400 font-mono">OANDA Live:</span>
+                        <iframe 
+                            src="https://s.tradingview.com/embed-widget/single-quote/?symbol=OANDA%3AXAUUSD&colorTheme=dark&isTransparent=true&locale=en" 
+                            style="width: 130px; height: 32px; border: none; overflow: hidden;" scrolling="no">
+                        </iframe>
+                        <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">1:1 Synced</span>
                     </div>
                 </div>
                 <div class="w-full flex-grow rounded-xl overflow-hidden border border-gray-800">
@@ -343,12 +346,12 @@
                     <h2 class="text-base md:text-lg font-bold text-cyan-400 flex items-center gap-2">
                         🤖 AI Swarm Live Autonomous Debate Room
                     </h2>
-                    <p class="text-xs md:text-sm text-gray-300">3 AI ຜູ້ຊ່ຽວຊານກຳລັງຕິດຕາມແທ່ງທຽນ, Volume ແລະ Indicators ສົດໆຈາກ TradingView ເພື່ອຖົກຖຽງກັນ</p>
+                    <p class="text-xs md:text-sm text-gray-300">3 AI ຜູ້ຊ່ຽວຊານກຳລັງຕິດຕາມແທ່ງທຽນ, Volume ແລະ Indicators ສົດໆຈາກ TradingView OANDA</p>
                 </div>
             </div>
             <div class="flex items-center gap-3 mt-3 md:mt-0">
                 <span class="text-xs bg-gray-800 text-yellow-300 border border-yellow-500/40 px-3 py-1.5 rounded-xl font-mono" id="debate-chart-status">
-                    Tracking TradingView Live...
+                    Tracking OANDA:XAUUSD Live...
                 </span>
                 <span class="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></span>
             </div>
@@ -417,32 +420,6 @@
     <script>
         const API_BASE = "/api";
         let activeTab = 'main';
-        let liveClientPrice = 0; // ລາຄາສົດທີ່ດຶງຜ່ານ Browser 0 Delay
-
-        // ==========================================
-        // 0. ດຶງລາຄາ Spot ໂດຍກົງຜ່ານ Browser 0 Delay (ຕົງກັບກຣາຟ 100%)
-        // ==========================================
-        async function fetchClientLivePrice() {
-            try {
-                // ດຶງຜ່ານ Public Spot Ticker ຂອງ Binance
-                const res = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT");
-                const data = await res.json();
-                if (data && data.price) {
-                    liveClientPrice = parseFloat(parseFloat(data.price).toFixed(2));
-                    document.getElementById('live-price-indicator').innerText = `$${liveClientPrice.toFixed(2)}`;
-                }
-            } catch (e) {
-                try {
-                    // ສຳຮອງຜ່ານ Coinbase Spot Feed
-                    const r2 = await fetch("https://api.coinbase.com/v2/prices/PAXG-USD/spot");
-                    const d2 = await r2.json();
-                    if (d2?.data?.amount) {
-                        liveClientPrice = parseFloat(parseFloat(d2.data.amount).toFixed(2));
-                        document.getElementById('live-price-indicator').innerText = `$${liveClientPrice.toFixed(2)}`;
-                    }
-                } catch(err) {}
-            }
-        }
 
         // ==========================================
         // ລະບົບສຽງແຈ້ງເຕືອນ 5 ນາທີ + ເລືອກເພງເອງໄດ້
@@ -450,7 +427,7 @@
         let customAudioUrl = null;
         let isSoundPlaying = false;
         let soundTimerInterval = null;
-        let soundTimeRemaining = 300; // 5 ນາທີ = 300 ວິນາທີ
+        let soundTimeRemaining = 300;
         let lastSweepTriggerId = null;
 
         function loadCustomAudio(event) {
@@ -579,18 +556,13 @@
         updateAsiaClock();
 
         // ==========================================
-        // ດຶງຂໍ້ມູນໜ້າຫຼັກ (ສົ່ງລາຄາ Client ໄປໃຫ້ Server ຄຳນວນ)
+        // ດຶງຂໍ້ມູນການວິເຄາະ & Key Levels
         // ==========================================
         async function fetchAnalysis() {
             try {
-                const url = liveClientPrice > 0 ? `${API_BASE}/analysis?clientPrice=${liveClientPrice}` : `${API_BASE}/analysis`;
-                const res = await fetch(url);
+                const res = await fetch(`${API_BASE}/analysis`);
                 const data = await res.json();
                 if (!data.success) return;
-
-                if (liveClientPrice === 0) {
-                    document.getElementById('live-price-indicator').innerText = `$${data.currentPrice}`;
-                }
 
                 document.getElementById('trend-direction').innerText = data.trend.direction;
                 document.getElementById('trend-strength').innerText = data.trend.strength;
@@ -633,8 +605,7 @@
         // ==========================================
         async function fetchLiquidityAnalysis() {
             try {
-                const url = liveClientPrice > 0 ? `${API_BASE}/liquidity-hunt?clientPrice=${liveClientPrice}` : `${API_BASE}/liquidity-hunt`;
-                const res = await fetch(url);
+                const res = await fetch(`${API_BASE}/liquidity-hunt`);
                 const data = await res.json();
                 if (!data.success) return;
 
@@ -716,8 +687,7 @@
         // ==========================================
         async function fetchAutoBotDebate() {
             try {
-                const url = liveClientPrice > 0 ? `${API_BASE}/swarm-live-debate?clientPrice=${liveClientPrice}` : `${API_BASE}/swarm-live-debate`;
-                const res = await fetch(url);
+                const res = await fetch(`${API_BASE}/swarm-live-debate`);
                 const data = await res.json();
                 if (data.success && data.messages) {
                     if (data.marketSnapshot) {
@@ -776,7 +746,7 @@
                 const res = await fetch(`${API_BASE}/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question: q, clientPrice: liveClientPrice })
+                    body: JSON.stringify({ question: q })
                 });
                 const data = await res.json();
                 document.getElementById(loadingId)?.remove();
@@ -919,15 +889,13 @@
         // ==========================================
         // ເລີ່ມຕົ້ນລະບົບ & Real-time Loops
         // ==========================================
-        fetchClientLivePrice();
         fetchAnalysis();
         fetchGeopolitics();
         fetchRedNews();
         fetchLiquidityAnalysis();
         fetchAutoBotDebate();
 
-        setInterval(fetchClientLivePrice, 1500);  // ດຶງລາຄາສົດໆຜ່ານ Browser ທຸກໆ 1.5 ວິນາທີ (0 Delay)
-        setInterval(fetchAnalysis, 2500);         // ຊິ້ງຄ໌ສັນຍານໜ້າຫຼັກທຸກໆ 2.5 ວິນາທີ
+        setInterval(fetchAnalysis, 2500);         // ຊິ້ງຄ໌ສັນຍານທຸກໆ 2.5 ວິນາທີ
         setInterval(fetchLiquidityAnalysis, 3500);// ກວດສອບ Liquidity Hunt ທຸກໆ 3.5 ວິນາທີ
         setInterval(fetchAutoBotDebate, 6000);    // AI Debate ວິເຄາະກຣາຟສົດທຸກໆ 6 ວິນາທີ
         setInterval(fetchGeopolitics, 20000);
