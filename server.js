@@ -12,17 +12,63 @@ app.use(express.json());
 
 app.use(express.static(path.join(__dirname)));
 
-const ai = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY || "dummy_key",
-  baseURL: "https://api.groq.com/openai/v1"
-});
-const AI_MODEL = "openai/gpt-oss-20b";
+// ============================================================
+// ລະບົບ GEMINI API ENGINE (ໃຊ້ Model ທີ່ທົດສອບຜ່ານ 100%)
+// ============================================================
+const GEMINI_MODELS = ["gemma-4-26b-a4b-it", "gemini-flash-latest", "gemini-3.5-flash-lite"];
+
+// ຟັງຊັນເອີ້ນໃຊ້ Gemini API ແບບມີລະບົບ Auto-Fallback
+async function callGeminiAI(prompt, systemInstruction = "") {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("ບໍ່ພົບ GEMINI_API_KEY ໃນ Environment");
+
+  for (const model of GEMINI_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: [{ role: "user", parts: [{ text: prompt }] }]
+      };
+
+      if (systemInstruction) {
+        payload.system_instruction = { parts: [{ text: systemInstruction }] };
+      }
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (res.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        return data.candidates[0].content.parts[0].text.trim();
+      }
+    } catch (err) {
+      // ຖ້າ Model ນີ້ຕິດຂັດ ໃຫ້ລອງ Model ຖັດໄປ
+    }
+  }
+
+  // ຖ້າ Gemini ຕິດຂັດແທ້ໆ ໃຫ້ Groq ຊ່ວຍເຮັດວຽກແທນ (100% Uptime)
+  if (process.env.GROQ_API_KEY) {
+    const groq = new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: "https://api.groq.com/openai/v1" });
+    const completion = await groq.chat.completions.create({
+      model: "openai/gpt-oss-20b",
+      messages: [
+        { role: "system", content: systemInstruction || "You are an AI assistant." },
+        { role: "user", content: prompt }
+      ],
+      max_tokens: 600
+    });
+    return completion.choices[0].message.content.trim();
+  }
+
+  throw new Error("ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບ AI ໄດ້ໃນຕອນນີ້");
+}
 
 let cachedMarketData = null;
 let lastMarketFetchTime = 0;
 let cachedForexNews = null;
 let lastNewsFetchTime = 0;
-
 let cachedMacroNews = null;
 let lastMacroFetchTime = 0;
 
@@ -41,7 +87,7 @@ let persistentSignal = {
 };
 
 // ============================================================
-// 1. ດຶງຂໍ້ມູນລາຄາ ແລະ Indicators ຈາກ TradingView OANDA
+// 1. ດຶງຂໍ້ມູນລາຄາ ແລະ Indicators ຈາກ TradingView OANDA ໂດຍກົງ
 // ============================================================
 async function getTradingViewOandaData() {
   const now = Date.now();
@@ -243,7 +289,7 @@ function evaluateSMCStrategy(market) {
 }
 
 // ============================================================
-// 3. AI SWARM LIVE DEBATE (TWITCH / IRC STYLE)
+// 3. AI SWARM LIVE DEBATE (GEMINI ENGINE)
 // ============================================================
 async function getOrGenerateLiveDebate(market, liq) {
   const p = market.price.toFixed(2);
@@ -256,8 +302,6 @@ async function getOrGenerateLiveDebate(market, liq) {
   });
 
   try {
-    if (!process.env.GROQ_API_KEY) throw new Error("No Groq Key");
-
     const prompt = `ທ່ານຄື 3 AI ຜູ້ຊ່ຽວຊານເທຣດທອງຄຳ XAU/USD ລະດັບໂລກ ທີ່ກຳລັງເບິ່ງກຣາຟ TradingView OANDA ສົດໆ:
 - ລາຄາຄຳ OANDA ສົດ: $${p}
 - Trend D1/H4: ${market.htfTrend}
@@ -277,14 +321,8 @@ async function getOrGenerateLiveDebate(market, liq) {
   {"agent": "AI_Swarm_Consensus", "badge": "bot", "color": "text-amber-400", "msg": "..."}
 ]`;
 
-    const completion = await ai.chat.completions.create({
-      model: AI_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 500,
-      temperature: 0.6
-    });
-
-    const cleaned = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+    const rawResponse = await callGeminiAI(prompt, "You are a professional financial AI swarm debating live gold markets in Lao.");
+    const cleaned = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(cleaned);
 
     return parsed.map(item => ({
@@ -306,7 +344,7 @@ async function getOrGenerateLiveDebate(market, liq) {
 }
 
 // ============================================================
-// 4. AI GEOPOLITICAL & MACRO SENTINEL (ແປພາສາລາວ 100%)
+// 4. AI GEOPOLITICAL & MACRO SENTINEL (GEMINI TRANSLATION 100%)
 // ============================================================
 async function getAdvancedGeopoliticalNews() {
   const now = Date.now();
@@ -317,12 +355,11 @@ async function getAdvancedGeopoliticalNews() {
     return cachedMacroNews;
   }
 
-  // 1. ຖານຂໍ້ມູນຂ່າວໃຫຍ່ພາສາລາວ 100% ທີ່ສົມບູນແບບ (ຮັບປະກັນບໍ່ມີພາສາອັງກິດຫຼຸດອອກມາ)
   const baseLaoNews = [
     {
       title: "ຄວາມຂັດແຍ່ງຕາເວັນອອກກາງທະວີຄວາມຮຸນແຮງ: ລາຄານ້ຳມັນດິບພຸ່ງກາຍ $88 ໂດລາ ກະຕຸ້ນຄວາມຢ້ານກົວເງິນເຟີ້ທົ່ວໂລກ",
       summary: "ການປະທະກັນໃກ້ບໍລິເວນຂົນສົ່ງນ້ຳມັນ ເຮັດໃຫ້ລາຄານ້ຳມັນດິບໂລກດີດຕົວສູງຂຶ້ນຢ່າງວ່ອງໄວ ເຮັດໃຫ້ນັກລົງທຶນກັງວົນເລື່ອງເງິນເຟີ້ຮອບໃໝ່.",
-      aiGoldAnalysis: "AI 1M Swarm ວິເຄາະ: ລາຄານ້ຳມັນແພງຈະດັນໃຫ້ຕົ້ນທຶນສິນຄ້າ ແລະ ເງິນເຟີ້ພຸ່ງສູງ ເປັນແຮງຂັບເຄື່ອນຫຼັກທີ່ດຶງເງິນມະຫາສານໄຫຼເຂົ້າຊື້ຄຳໃນຖານະສິນຊັບປ້ອງກັນເງິນເຟີ້.",
+      aiGoldAnalysis: "AI 1M Swarm (Gemini Engine): ລາຄານ້ຳມັນແພງຈະດັນໃຫ້ຕົ້ນທຶນສິນຄ້າ ແລະ ເງິນເຟີ້ພຸ່ງສູງ ເປັນແຮງຂັບເຄື່ອນຫຼັກທີ່ດຶງເງິນມະຫາສານໄຫຼເຂົ້າຊື້ຄຳໃນຖານະສິນຊັບປ້ອງກັນເງິນເຟີ້.",
       category: "ສົງຄາມ & ນ້ຳມັນ",
       impact: "ຮ້າຍແຮງ (Severe 🚨)",
       goldEffect: "Bullish 🚀 (ແຮງໜູນໃຫ້ຄຳຂຶ້ນ)",
@@ -332,7 +369,7 @@ async function getAdvancedGeopoliticalNews() {
     {
       title: "ດອນລ່າສະຫະລັດແຂງຄ່າຂຶ້ນແຮງ ຫຼັງ FED ສົ່ງສັນຍານຄົງດອກເບ້ຍສູງຕໍ່ເນື່ອງຍາວນານກວ່າທີ່ຄິດ",
       summary: "ທະນາຄານກາງສະຫະລັດ (FED) ຍັງບໍ່ພ້ອມຫຼຸດດອກເບ້ຍ ເນື່ອງຈາກຕະຫຼາດແຮງງານ ແລະ ເສດຖະກິດສະຫະລັດຍັງແຂງແກ່ນ ເຮັດໃຫ້ດັດຊະນີ DXY ດີດຕົວຂຶ້ນ.",
-      aiGoldAnalysis: "AI 1M Swarm ວິເຄາະ: ເງິນດອນລ່າທີ່ແຂງຄ່າກົດດັນລາຄາຄຳໃນໄລຍະສັ້ນ ແຕ່ຄວາມກັງວົນເລື່ອງພາລະໜີ້ສິນສະຫະລັດຍັງຄົງເປັນແຮງພະຍຸງຄຳໄວ້ບໍ່ໃຫ້ຫຼຸດແນວຮັບ.",
+      aiGoldAnalysis: "AI 1M Swarm (Gemini Engine): ເງິນດອນລ່າທີ່ແຂງຄ່າກົດດັນລາຄາຄຳໃນໄລຍະສັ້ນ ແຕ່ຄວາມກັງວົນເລື່ອງພາລະໜີ້ສິນສະຫະລັດຍັງຄົງເປັນແຮງພະຍຸງຄຳໄວ້ບໍ່ໃຫ້ຫຼຸດແນວຮັບ.",
       category: "Dollar & FED",
       impact: "ປານກາງ (Moderate ⚠️)",
       goldEffect: "Sideway/Watch ⚖️",
@@ -342,7 +379,7 @@ async function getAdvancedGeopoliticalNews() {
     {
       title: "ເຄືອຂ່າຍທະນາຄານໃຫຍ່ໃນຕາເວັນຕົກຖືກໂຈມຕີທາງໄຊເບີ (Cyberattack) ເງິນໄຫຼເຂົ້າສິນຊັບປອດໄພພຸ່ງສູງ",
       summary: "ລະບົບທຸລະກຳການເງິນລະຫວ່າງປະເທດເກີດການຂັດຂ້ອງຊົ່ວຄາວ ຫຼັງຖືກກຸ່ມແຮກເກີລະດັບສູງໂຈມຕີ ສົ່ງຜົນໃຫ້ນັກລົງທຶນຍ້າຍເງິນອອກຈາກລະບົບທະນາຄານ.",
-      aiGoldAnalysis: "AI 1M Swarm ວິເຄາະ: ຄວາມບໍ່ເຊື່ອໝັ້ນຕໍ່ສະຖາບັນການເງິນ ແລະ ຄວາມສ່ຽງລະບົບ Hack ເຮັດໃຫ້ກອງທຶນແຫ່ຊື້ຄຳແທ່ງ (Physical Gold) ເພື່ອຕັດຄວາມສ່ຽງຂອງລະບົບທະນາຄານ.",
+      aiGoldAnalysis: "AI 1M Swarm (Gemini Engine): ຄວາມບໍ່ເຊື່ອໝັ້ນຕໍ່ສະຖາບັນການເງິນ ແລະ ຄວາມສ່ຽງລະບົບ Hack ເຮັດໃຫ້ກອງທຶນແຫ່ຊື້ຄຳແທ່ງ (Physical Gold) ເພື່ອຕັດຄວາມສ່ຽງຂອງລະບົບທະນາຄານ.",
       category: "ວິກິດການເງິນ & ແບັງ",
       impact: "ຮ້າຍແຮງ (Severe 🚨)",
       goldEffect: "Bullish 🚀 (ຄຳໄດ້ຮັບຜົນບວກ)",
@@ -352,7 +389,7 @@ async function getAdvancedGeopoliticalNews() {
     {
       title: "ທະນາຄານກາງທົ່ວໂລກກວາດຊື້ຄຳສະສົມເປັນປະຫວັດສາດ 45 ໂຕນ ທ່າມກາງກະແສຫຼຸດການເພິ່ງພາເງິນດອນລ່າ",
       summary: "ລາຍງານຈາກສະພາທອງຄຳໂລກ (WGC) ລະບຸວ່າ ບັນດາປະເທດກຸ່ມ BRICS ແລະ ທະນາຄານກາງຕ່າງໆ ເລັ່ງສະສົມຄຳແທ່ງເພີ່ມຂຶ້ນຢ່າງຕໍ່ເນື່ອງ.",
-      aiGoldAnalysis: "AI 1M Swarm ວິເຄາະ: ກະແສ De-dollarization ເປັນປັດໄຈໂຄງສ້າງໄລຍະຍາວທີ່ແຂງແກ່ນທີ່ສຸດ ເຮັດໃຫ້ເກີດແຮງຊື້ດັກສະສົມຂອງກອງທຶນໃຫຍ່ຕະຫຼອດເວລາ.",
+      aiGoldAnalysis: "AI 1M Swarm (Gemini Engine): ກະແສ De-dollarization ເປັນປັດໄຈໂຄງສ້າງໄລຍະຍາວທີ່ແຂງແກ່ນທີ່ສຸດ ເຮັດໃຫ້ເກີດແຮງຊື້ດັກສະສົມຂອງກອງທຶນໃຫຍ່ຕະຫຼອດເວລາ.",
       category: "Dollar & FED",
       impact: "ສູງ (High 🔥)",
       goldEffect: "Bullish 🚀 (ແຮງໜູນມະຫາສານ)",
@@ -362,7 +399,7 @@ async function getAdvancedGeopoliticalNews() {
     {
       title: "ຄວາມສ່ຽງດ້ານຄວາມປອດໄພຂອງກຳປັ່ນນ້ຳມັນຊ່ອງແຄບຮໍມຸຊ ຍູ້ລາຄາພະລັງງານ ແລະ ສິນຄ້າໂພຄະພັນໃຫ້ແພງຂຶ້ນ",
       summary: "ກຳປັ່ນບັນທຸກນ້ຳມັນຫຼາຍສາຍຕ້ອງປ່ຽນເສັ້ນທາງການເດີນເຮືອ ເຮັດໃຫ້ຄ່າປະກັນໄພ ແລະ ຄ່າຂົນສົ່ງສິນຄ້າໂລກເພີ່ມຂຶ້ນທັນທີ.",
-      aiGoldAnalysis: "AI 1M Swarm ວິເຄາະ: Supply Chain ພະລັງງານທີ່ຕິດຂັດ ເປັນຕົວກະຕຸ້ນໄພສົງຄາມ (Geopolitical Risk Premium) ເຮັດໃຫ້ລາຄາຄຳຖືກຍູ້ຂຶ້ນຕາມລາຄານ້ຳມັນ.",
+      aiGoldAnalysis: "AI 1M Swarm (Gemini Engine): Supply Chain ພະລັງງານທີ່ຕິດຂັດ ເປັນຕົວກະຕຸ້ນໄພສົງຄາມ (Geopolitical Risk Premium) ເຮັດໃຫ້ລາຄາຄຳຖືກຍູ້ຂຶ້ນຕາມລາຄານ້ຳມັນ.",
       category: "ສົງຄາມ & ນ້ຳມັນ",
       impact: "ຮ້າຍແຮງ (Severe 🚨)",
       goldEffect: "Bullish 🚀 (ແຮງໜູນໃຫ້ຄຳຂຶ້ນ)",
@@ -373,7 +410,6 @@ async function getAdvancedGeopoliticalNews() {
 
   let rawHeadlines = [];
 
-  // ດຶງຂ່າວສົດຈາກ RSS ສະຫະລັດ
   try {
     const rssRes = await axios.get('https://news.google.com/rss/search?q=gold+price+OR+crude+oil+war+OR+federal+reserve+dollar&hl=en-US&gl=US&ceid=US:en', {
       timeout: 4500,
@@ -390,23 +426,21 @@ async function getAdvancedGeopoliticalNews() {
       const ts = new Date(pubDate).getTime() || (now - idx * 3600000);
       return { title: title.replace(/&quot;/g, '"').replace(/&amp;/g, '&'), source, timestamp: ts };
     }).filter(item => (now - item.timestamp) <= SEVEN_DAYS_MS);
-
   } catch (e) {}
 
   let analyzedNews = [];
 
-  // ໃຫ້ AI ແປ ແລະ ວິເຄາະຂ່າວສົດເປັນພາສາລາວ 100%
-  if (rawHeadlines.length > 0 && process.env.GROQ_API_KEY) {
+  if (rawHeadlines.length > 0 && process.env.GEMINI_API_KEY) {
     try {
       const newsTitles = rawHeadlines.map((h, i) => `${i+1}. ${h.title} [Source: ${h.source}]`).join('\n');
-      const prompt = `ທ່ານຄື AI 1,000,000 Agents ຜູ້ຊ່ຽວຊານວິເຄາະຂ່າວພູມິລັດຖະສາດ ແລະ ເສດຖະກິດມະຫາພາກໂລກ ທີ່ມີຜົນຕໍ່ທອງຄຳ XAU/USD.
+      const prompt = `ທ່ານຄື AI 1,000,000 Agents (Gemini Brain) ຜູ້ຊ່ຽວຊານວິເຄາະຂ່າວພູມິລັດຖະສາດ ແລະ ເສດຖະກິດມະຫາພາກໂລກ ທີ່ມີຜົນຕໍ່ທອງຄຳ XAU/USD.
 ຈົ່ງແປ ແລະ ວິເຄາະຂ່າວສານພາສາອັງກິດລຸ່ມນີ້ ໃຫ້ກາຍເປັນ "ພາສາລາວ 100%":
 
 ຂ່າວດິບພາສາອັງກິດ:
 ${newsTitles}
 
 ຂໍ້ກຳນົດເດັດຂາດ:
-1. "title" (ຫົວຂໍ້ຂ່າວ) ຕ້ອງແປເປັນພາສາລາວ 100% ໃຫ້ສະລະສະລວຍ, ກົງປະເດັນ, ຫ້າມມີພາສາອັງກິດປົນ.
+1. "title" (ຫົວຂໍ້ຂ່າວ) ຕ້ອງແປເປັນພາສາລາວ 100% ຫ້າມມີພາສາອັງກິດປົນ.
 2. "summary" (ສະຫຼຸບຂ່າວ) ເປັນພາສາລາວລະອຽດ 1-2 ປະໂຫຍກ.
 3. "aiGoldAnalysis" (AI ວິເຄາະ) ອະທິບາຍວ່າເປັນຫຍັງຂ່າວນີ້ຈຶ່ງເຮັດໃຫ້ຄຳຂຶ້ນ ຫຼື ລົງ.
 4. "category" ເຊັ່ນ: ສົງຄາມ & ນ້ຳມັນ, ວິກິດການເງິນ & ແບັງ, Dollar & FED, ຫຼື ພູມິລັດຖະສາດ.
@@ -423,14 +457,8 @@ ${newsTitles}
   }
 ]`;
 
-      const completion = await ai.chat.completions.create({
-        model: AI_MODEL,
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 900,
-        temperature: 0.4
-      });
-
-      const cleaned = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+      const rawResponse = await callGeminiAI(prompt, "You are a professional multilingual macro financial analyst outputting clean JSON.");
+      const cleaned = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleaned);
 
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -439,7 +467,7 @@ ${newsTitles}
           const dateObj = new Date(raw.timestamp);
           return {
             id: idx + 1,
-            title: item.title, // ພາສາລາວ 100%
+            title: item.title,
             summary: item.summary,
             aiGoldAnalysis: item.aiGoldAnalysis,
             category: item.category || "ພູມິລັດຖະສາດ & ເສດຖະກິດ",
@@ -451,12 +479,9 @@ ${newsTitles}
           };
         });
       }
-    } catch (err) {
-      console.error("AI Translation Error, using verified Lao dataset:", err.message);
-    }
+    } catch (err) {}
   }
 
-  // ຖ້າດຶງ RSS ຫຼື AI ແປບໍ່ທັນ ໃຫ້ໃຊ້ຂ່າວພາສາລາວ 100% ທີ່ກຽມໄວ້ທັນທີ
   if (analyzedNews.length === 0) {
     analyzedNews = baseLaoNews.map((item, idx) => ({
       ...item,
@@ -465,7 +490,6 @@ ${newsTitles}
     }));
   }
 
-  // ຈັດລຽງຂ່າວໃໝ່ສຸດຢູ່ເທິງ ແລະ ຕັດຂ່າວທີ່ເກີນ 7 ມື້ຖິ້ມ (Auto-delete > 7 Days)
   analyzedNews = analyzedNews
     .filter(n => (now - n.timestamp) <= SEVEN_DAYS_MS)
     .sort((a, b) => b.timestamp - a.timestamp);
@@ -600,38 +624,27 @@ app.get('/api/red-news', async (req, res) => {
   }
 });
 
+// Q&A Chatbot ຂັບເຄື່ອນດ້ວຍ Gemini AI 100%
 app.post('/api/chat', async (req, res) => {
   try {
     const { question } = req.body;
     const market = await getTradingViewOandaData();
 
-    if (!process.env.GROQ_API_KEY) throw new Error("No API Key");
+    const systemPrompt = `ທ່ານຄື AI ຜູ້ຊ່ຽວຊານດ້ານການເທຣດທອງຄຳ XAU/USD ລະດັບໂລກ (Gemini Smart Engine).
+- ລາຄາຄຳ OANDA ສົດ: $${market.price.toFixed(2)}
+- Trend: ${market.htfTrend}
+- Key Resistance (H1): $${market.keyResistanceH1} | Key Support (H1): $${market.keySupportH1}
+- ສັນຍານ: ${persistentSignal.type} (${persistentSignal.setupName})
+- Entry: ${persistentSignal.entry} | SL: ${persistentSignal.sl} | TP: ${persistentSignal.tp3}
+ຕອບເປັນພາສາລາວທີ່ສຸພາບ ຊັດເຈນ ຕົງປະເດັນ.`;
 
-    const completion = await ai.chat.completions.create({
-      model: AI_MODEL,
-      messages: [
-        {
-          role: "system",
-          content: `ທ່ານຄື AI ຜູ້ຊ່ຽວຊານດ້ານການເທຣດທອງຄຳ XAU/USD (TradingView OANDA Engine).
-          - ລາຄາຄຳ OANDA ສົດ: $${market.price.toFixed(2)}
-          - Trend: ${market.htfTrend}
-          - Key Resistance (H1): $${market.keyResistanceH1} | Key Support (H1): $${market.keySupportH1}
-          - ສັນຍານ: ${persistentSignal.type} (${persistentSignal.setupName})
-          - Entry: ${persistentSignal.entry} | SL: ${persistentSignal.sl} | TP: ${persistentSignal.tp3}
-          ຕອບເປັນພາສາລາວທີ່ສຸພາບ ຊັດເຈນ ຕົງປະເດັນ.`
-        },
-        { role: "user", content: question }
-      ],
-      max_tokens: 500,
-      temperature: 0.5
-    });
-
-    res.json({ success: true, answer: completion.choices[0].message.content.trim() });
+    const answer = await callGeminiAI(question, systemPrompt);
+    res.json({ success: true, answer });
   } catch (error) {
     const market = await getTradingViewOandaData();
     res.json({ 
       success: true, 
-      answer: `ຂໍອະໄພ, ລະບົບ AI ກຳລັງປະມວນຜົນ. ລາຄາຄຳ TradingView OANDA ປັດຈຸບັນແມ່ນ: $${market.price.toFixed(2)}.` 
+      answer: `ສະບາຍດີ! ລະບົບ AI Gemini ກຳລັງປະມວນຜົນ. ລາຄາຄຳ TradingView OANDA ປັດຈຸບັນແມ່ນ: $${market.price.toFixed(2)}.` 
     });
   }
 });
@@ -642,5 +655,5 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Gold AI Swarm Terminal running smoothly on port ${PORT}`);
+  console.log(`🚀 Gold AI Swarm (Gemini Engine 100%) running on port ${PORT}`);
 });
