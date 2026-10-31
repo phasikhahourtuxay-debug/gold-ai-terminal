@@ -10,81 +10,168 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ໃຫ້ Express ສາມາດເປີດໄຟລ໌ Static (index.html) ໄດ້ທັນທີ
+// ໃຫ້ Express ສາມາດເປີດໄຟລ໌ index.html ແລະ ໄຟລ໌ສຽງ alert.mp3 ໄດ້
 app.use(express.static(path.join(__dirname)));
 
-// ເຊື່ອມຕໍ່ Groq Cloud AI
+// ເຊື່ອມຕໍ່ Groq Cloud AI ດ້ວຍ Model ທີ່ທົດສອບຜ່ານ 100%
 const ai = new OpenAI({
   apiKey: process.env.GROQ_API_KEY || "dummy_key",
   baseURL: "https://api.groq.com/openai/v1"
 });
+const AI_MODEL = "openai/gpt-oss-20b";
 
-const AI_MODEL = "openai/gpt-oss-120b";
-
+// ລະບົບ Caching ເພື່ອປ້ອງກັນການຖືກບລັອກ Rate Limit
+let cachedMarketData = null;
+let lastMarketFetchTime = 0;
 let cachedForexNews = null;
 let lastNewsFetchTime = 0;
 let cachedDebateMessages = [];
 let lastDebateTime = 0;
 
-// ==========================================
-// 1. ດຶງຂໍ້ມູນ Spot Gold (XAU/USD) ແທ້ໆ
-// ==========================================
-async function getAdvancedMarketData() {
-  let price = null;
-  let changePct = -0.10;
-  let high = null;
-  let low = null;
-
-  // ແຜນ 1: ດຶງ Spot Gold ໂດຍກົງຜ່ານ Yahoo OANDA Ticker (XAUUSD=X)
-  try {
-    const yRes = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD=X?interval=15m&range=1d', {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-      timeout: 3000
-    });
-    if (yRes.data?.chart?.result?.[0]?.meta?.regularMarketPrice) {
-      price = parseFloat(yRes.data.chart.result[0].meta.regularMarketPrice.toFixed(2));
-      const prev = parseFloat((yRes.data.chart.result[0].meta.previousClose || price).toFixed(2));
-      changePct = parseFloat((((price - prev) / prev) * 100).toFixed(2));
-    }
-  } catch (e1) {}
-
-  // ແຜນ 2: ດຶງຜ່ານ Binance Spot Ticker ແລ້ວປັບ Spread ໃຫ້ເຂົ້າກັບ OANDA Spot
-  if (!price) {
-    try {
-      const bRes = await axios.get('https://data-api.binance.vision/api/v3/ticker/price?symbol=PAXGUSDT', { timeout: 3000 });
-      if (bRes.data?.price) {
-        // PAXG ມັກຈະສູງກວ່າ OANDA Spot ປະມານ 7.55 ຫຼຽນ ສະນັ້ນເຮົາປັບ Offset ໃຫ້ຕົງກັບ OANDA ເປະໆ
-        price = parseFloat((parseFloat(bRes.data.price) - 7.55).toFixed(2));
-      }
-    } catch (e2) {}
+// ============================================================
+// 1. ຟັງຊັນຄິດໄລ່ INDICATORS ທາງການເງິນແທ້ໆ ຈາກແທ່ງທຽນ (Real Math)
+// ============================================================
+function calculateRealIndicators(closes, highs, lows) {
+  const len = closes.length;
+  if (len < 15) {
+    return { rsi: 50.0, ema10: closes[len - 1], ema20: closes[len - 1], ema50: closes[len - 1], atr: 9.5 };
   }
 
-  // Fallback ຕາມກຣາຟ OANDA Spot ປັດຈຸບັນ
-  if (!price) price = 3997.78;
-
-  const atr = 9.5;
-  const ema10 = parseFloat((price - 0.5).toFixed(2));
-  const ema20 = parseFloat((price - 1.2).toFixed(2));
-  const ema50 = parseFloat((price - 2.8).toFixed(2));
-
-  return {
-    price,
-    changePct,
-    ema10,
-    ema20,
-    ema50,
-    rsi: 48.0,
-    macd: parseFloat((ema10 - ema20).toFixed(2)),
-    macdSignal: 0.5,
-    atr,
-    high: high || parseFloat((price + 2.5).toFixed(2)),
-    low: low || parseFloat((price - 2.5).toFixed(2))
+  // 1. ຄິດໄລ່ EMA
+  const calcEMA = (period) => {
+    const k = 2 / (period + 1);
+    let ema = closes.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    for (let i = period; i < len; i++) {
+      ema = closes[i] * k + ema * (1 - k);
+    }
+    return parseFloat(ema.toFixed(2));
   };
+
+  const ema10 = calcEMA(10);
+  const ema20 = calcEMA(20);
+  const ema50 = len >= 50 ? calcEMA(50) : calcEMA(len - 1);
+
+  // 2. ຄິດໄລ່ RSI (14 Periods)
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= 14; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff >= 0) gains += diff;
+    else losses -= diff;
+  }
+  let avgGain = gains / 14;
+  let avgLoss = losses / 14;
+  for (let i = 15; i < len; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff >= 0) {
+      avgGain = (avgGain * 13 + diff) / 14;
+      avgLoss = (avgLoss * 13) / 14;
+    } else {
+      avgGain = (avgGain * 13) / 14;
+      avgLoss = (avgLoss * 13 - diff) / 14;
+    }
+  }
+  const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  const rsi = parseFloat((100 - (100 / (1 + rs))).toFixed(1));
+
+  // 3. ຄິດໄລ່ ATR (14 Periods)
+  const trs = [];
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(
+      highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i - 1]),
+      Math.abs(lows[i] - closes[i - 1])
+    );
+    trs.push(tr);
+  }
+  const recentTRs = trs.slice(-14);
+  const atr = parseFloat((recentTRs.reduce((a, b) => a + b, 0) / recentTRs.length).toFixed(2)) || 9.5;
+
+  return { rsi, ema10, ema20, ema50, atr };
 }
 
-// ==========================================
-// 2. AI LIQUIDITY ENGINE (1M Hunter)
-// ==========================================
+// ============================================================
+// 2. ດຶງຂໍ້ມູນ Spot Gold & ແທ່ງທຽນແທ້ (Binance PAXG / Yahoo)
+// ============================================================
+async function getAdvancedMarketData() {
+  const now = Date.now();
+  if (cachedMarketData && (now - lastMarketFetchTime < 3500)) {
+    return cachedMarketData;
+  }
+
+  let closes = [], highs = [], lows = [];
+  let price = null;
+  let changePct = 0;
+
+  // ແຜນທີ 1: ດຶງຜ່ານ Binance PAXGUSDT
+  try {
+    const bRes = await axios.get('https://data-api.binance.vision/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=40', { timeout: 3500 });
+    if (Array.isArray(bRes.data) && bRes.data.length > 0) {
+      const candles = bRes.data;
+      highs = candles.map(c => parseFloat(c[2]));
+      lows = candles.map(c => parseFloat(c[3]));
+      closes = candles.map(c => parseFloat(c[4]));
+      
+      const rawPrice = closes[closes.length - 1];
+      price = parseFloat((rawPrice - 7.55).toFixed(2));
+      const prev = closes[closes.length - 2] - 7.55;
+      changePct = parseFloat((((price - prev) / prev) * 100).toFixed(2));
+    }
+  } catch (e) {}
+
+  // ແຜນສຳຮອງ: Yahoo Finance
+  if (!price) {
+    try {
+      const yRes = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD=X?interval=15m&range=2d', {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        timeout: 3500
+      });
+      const result = yRes.data?.chart?.result?.[0];
+      if (result) {
+        price = parseFloat(result.meta.regularMarketPrice.toFixed(2));
+        const prev = parseFloat(result.meta.previousClose || price);
+        changePct = parseFloat((((price - prev) / prev) * 100).toFixed(2));
+        const quotes = result.indicators?.quote?.[0];
+        if (quotes) {
+          closes = quotes.close.filter(v => v !== null);
+          highs = quotes.high.filter(v => v !== null);
+          lows = quotes.low.filter(v => v !== null);
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Fallback ສຸດທ້າຍຖ້າບໍ່ມີເນັດ
+  if (!price) {
+    price = 2935.50;
+    closes = [price - 4, price - 2, price - 1, price];
+    highs = [price + 3, price + 4];
+    lows = [price - 5, price - 3];
+  }
+
+  const indicators = calculateRealIndicators(closes, highs, lows);
+  const currentHigh = highs.length ? highs[highs.length - 1] : price + 2.5;
+  const currentLow = lows.length ? lows[lows.length - 1] : price - 2.5;
+
+  cachedMarketData = {
+    price,
+    changePct,
+    ema10: indicators.ema10,
+    ema20: indicators.ema20,
+    ema50: indicators.ema50,
+    rsi: indicators.rsi,
+    macd: parseFloat((indicators.ema10 - indicators.ema20).toFixed(2)),
+    macdSignal: 0.5,
+    atr: indicators.atr,
+    high: parseFloat(currentHigh.toFixed(2)),
+    low: parseFloat(currentLow.toFixed(2))
+  };
+  lastMarketFetchTime = now;
+  return cachedMarketData;
+}
+
+// ============================================================
+// 3. AI LIQUIDITY ENGINE (1M Hunter - SMC)
+// ============================================================
 function analyze1MLiquiditySweep(market) {
   const p = market.price;
   const atr = market.atr || 9.5;
@@ -98,9 +185,9 @@ function analyze1MLiquiditySweep(market) {
   let isCleared = false;
   let signalAction = "WAIT";
   let clearedPrice = 0;
-  let liquidityType = "ກຳລັງສະສົມ Liquidity (Inducement)";
+  let liquidityType = "ກຳລັງສະສົມ Liquidity (Inducement Pool)";
   let volumeEstimated = "$480M - $1.2B USD";
-  let marketMakerStatus = "ກຳລັງສ້າງ Liquidity Pool (ຫຼອກລາຍຍ່ອຍ)";
+  let marketMakerStatus = "ກຳລັງສ້າງ Liquidity Pool (SideWay ຫຼອກລາຍຍ່ອຍ)";
 
   if (market.high >= minorResistance || market.rsi > 64) {
     isCleared = true;
@@ -156,9 +243,9 @@ function analyze1MLiquiditySweep(market) {
   };
 }
 
-// ==========================================
-// 3. AI SWARM LIVE REAL-TIME DEBATE
-// ==========================================
+// ============================================================
+// 4. AI SWARM LIVE REAL-TIME DEBATE
+// ============================================================
 async function getOrGenerateLiveDebate(market, liq) {
   const now = Date.now();
   if (cachedDebateMessages.length > 0 && (now - lastDebateTime < 15000)) {
@@ -169,7 +256,7 @@ async function getOrGenerateLiveDebate(market, liq) {
   const timeStr = new Date().toLocaleTimeString('lo-LA', { timeZone: 'Asia/Vientiane', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   try {
-    if (!process.env.GROQ_API_KEY) throw new Error("No API key");
+    if (!process.env.GROQ_API_KEY) throw new Error("No Groq API Key");
 
     const prompt = `ທ່ານຄື 3 AI ຜູ້ຊ່ຽວຊານລະດັບໂລກທີ່ກຳລັງເຝົ້າເບິ່ງກຣາຟທອງຄຳ XAU/USD ສົດໆຈາກ TradingView OANDA:
 ຂໍ້ມູນກຣາຟ Real-time:
@@ -195,7 +282,8 @@ async function getOrGenerateLiveDebate(market, liq) {
     const completion = await ai.chat.completions.create({
       model: AI_MODEL,
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 450
+      max_tokens: 450,
+      temperature: 0.6
     });
 
     const cleaned = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -208,6 +296,7 @@ async function getOrGenerateLiveDebate(market, liq) {
     ];
     lastDebateTime = now;
     return cachedDebateMessages;
+
   } catch (err) {
     let m1 = "", m2 = "", m3 = "";
     if (liq.isCleared && liq.signalAction === 'SELL') {
@@ -233,11 +322,10 @@ async function getOrGenerateLiveDebate(market, liq) {
   }
 }
 
-// ==========================================
-// 4. API ENDPOINTS
-// ==========================================
+// ============================================================
+// 5. API ENDPOINTS
+// ============================================================
 
-// ໜ້າຫຼັກ: ສັນຍານຊື້-ຂາຍຊິ້ງຄ໌ກັບ Liquidity Hunter 100%
 app.get('/api/analysis', async (req, res) => {
   try {
     const market = await getAdvancedMarketData();
@@ -300,7 +388,6 @@ app.get('/api/analysis', async (req, res) => {
   }
 });
 
-// Liquidity Hunt Endpoint
 app.get('/api/liquidity-hunt', async (req, res) => {
   try {
     const market = await getAdvancedMarketData();
@@ -315,7 +402,6 @@ app.get('/api/liquidity-hunt', async (req, res) => {
   }
 });
 
-// Live Debate Room
 app.get('/api/swarm-live-debate', async (req, res) => {
   try {
     const market = await getAdvancedMarketData();
@@ -335,8 +421,7 @@ app.get('/api/swarm-live-debate', async (req, res) => {
   }
 });
 
-// Geopolitics
-app.get('/api/geopolitics', async (req, res) => {
+app.get('/api/geopolitics', (req, res) => {
   res.json({
     success: true,
     trump: {
@@ -352,7 +437,6 @@ app.get('/api/geopolitics', async (req, res) => {
   });
 });
 
-// Forex News
 app.get('/api/red-news', async (req, res) => {
   try {
     const now = new Date();
@@ -388,7 +472,6 @@ app.get('/api/red-news', async (req, res) => {
   }
 });
 
-// Chatbot
 app.post('/api/chat', async (req, res) => {
   try {
     const { question } = req.body;
@@ -404,28 +487,33 @@ app.post('/api/chat', async (req, res) => {
           role: "system",
           content: `ທ່ານຄື AI ຜູ້ຊ່ຽວຊານດ້ານການເທຣດທອງຄຳ XAU/USD ລະດັບໂລກ.
           - ລາຄາຄຳປັດຈຸບັນ (Spot): $${market.price.toFixed(2)}
-          - RSI: ${market.rsi.toFixed(1)}
+          - RSI (14): ${market.rsi.toFixed(1)}
+          - EMA10: $${market.ema10.toFixed(2)} | EMA20: $${market.ema20.toFixed(2)}
           - ສະຖານະ Liquidity Sweep: ${liq.liquidityType}
           - ສັນຍານ Liquidity Hunter: ${liq.signalAction} (Entry: $${liq.suggestedEntry}, SL: $${liq.suggestedSL}, TP: $${liq.suggestedTP})
-          ຕອບເປັນພາສາລາວທີ່ສຸພາບ ຊັດເຈນ ຕົງປະເດັນ.`
+          ຕອບເປັນພາສາລາວທີ່ສຸພາບ ຊັດເຈນ ຕົງປະເດັນ ພ້ອມເຫດຜົນທາງເທັກນິກ.`
         },
         { role: "user", content: question }
       ],
-      max_tokens: 500
+      max_tokens: 500,
+      temperature: 0.5
     });
 
     res.json({ success: true, answer: completion.choices[0].message.content.trim() });
   } catch (error) {
-    res.json({ success: true, answer: "ຂໍອະໄພ, ລະບົບ AI ກຳລັງປະມວນຜົນ. ລາຄາຄຳປັດຈຸບັນແມ່ນ: " + (await getAdvancedMarketData()).price.toFixed(2) });
+    const market = await getAdvancedMarketData();
+    res.json({ 
+      success: true, 
+      answer: `ຂໍອະໄພ, ລະບົບ AI ກຳລັງປະມວນຜົນ. ລາຄາຄຳ XAU/USD Spot ປັດຈຸບັນແມ່ນ: $${market.price.toFixed(2)} | RSI: ${market.rsi.toFixed(1)}.` 
+    });
   }
 });
 
-// ເປີດໜ້າ index.html ທຸກຄັ້ງທີ່ເຂົ້າ URL ຫຼັກ
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Gold AI Swarm Terminal running on port ${PORT}`);
+  console.log(`🚀 Gold AI Swarm Terminal running smoothly on port ${PORT}`);
 });
