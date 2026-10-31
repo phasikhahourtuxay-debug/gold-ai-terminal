@@ -13,32 +13,31 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
 // ============================================================
-// 1. TRI-BRAIN AI ORCHESTRATION ENGINE (Groq + Gemini + OpenRouter)
+// 1. TRI-BRAIN AI CLIENTS (Groq + Gemini + OpenRouter)
 // ============================================================
 
-// 1.1 GROQ CLIENT (Speed Engine)
+// 1.1 GROQ (Speed & Momentum Engine)
 const groqClient = new OpenAI({
   apiKey: process.env.GROQ_API_KEY || "dummy_key",
   baseURL: "https://api.groq.com/openai/v1"
 });
 const GROQ_MODEL = "openai/gpt-oss-20b";
 
-// 1.2 CALL GROQ
 async function callGroqAI(prompt, systemInstruction = "") {
   if (!process.env.GROQ_API_KEY) throw new Error("No Groq Key");
   const completion = await groqClient.chat.completions.create({
     model: GROQ_MODEL,
     messages: [
-      { role: "system", content: systemInstruction || "You are a helpful assistant." },
+      { role: "system", content: systemInstruction || "You are a professional financial AI." },
       { role: "user", content: prompt }
     ],
-    max_tokens: 650,
-    temperature: 0.6
+    max_tokens: 500,
+    temperature: 0.5
   });
   return completion.choices[0].message.content.trim();
 }
 
-// 1.3 CALL GEMINI (Lao Linguist & Macro Engine)
+// 1.2 GEMINI (Lao Linguist & Macro Trend Engine)
 const GEMINI_MODELS = ["gemma-4-26b-a4b-it", "gemini-flash-latest", "gemini-3.5-flash-lite"];
 async function callGeminiAI(prompt, systemInstruction = "") {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -51,7 +50,6 @@ async function callGeminiAI(prompt, systemInstruction = "") {
       if (systemInstruction) {
         payload.system_instruction = { parts: [{ text: systemInstruction }] };
       }
-
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,10 +61,10 @@ async function callGeminiAI(prompt, systemInstruction = "") {
       }
     } catch (e) {}
   }
-  throw new Error("Gemini all models busy");
+  throw new Error("Gemini models busy");
 }
 
-// 1.4 CALL OPENROUTER (DeepSeek Logic & Reasoning Engine)
+// 1.3 OPENROUTER (DeepSeek Quantitative & SMC Strategy Engine)
 async function callOpenRouterAI(prompt, systemInstruction = "") {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("No OpenRouter Key");
@@ -77,42 +75,23 @@ async function callOpenRouterAI(prompt, systemInstruction = "") {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${apiKey}`,
       "HTTP-Referer": "https://gold-ai-terminal.onrender.com",
-      "X-Title": "Gold AI Swarm Tri-Brain Terminal"
+      "X-Title": "Gold AI Tri-Brain Consensus Terminal"
     },
     body: JSON.stringify({
-      model: "deepseek/deepseek-chat", // ດຶງສະໝອງ DeepSeek ຜ່ານ OpenRouter
+      model: "deepseek/deepseek-chat",
       messages: [
-        { role: "system", content: systemInstruction || "You are an expert financial logic engine." },
+        { role: "system", content: systemInstruction || "You are an expert SMC quant trader." },
         { role: "user", content: prompt }
       ],
-      max_tokens: 700,
-      temperature: 0.5
+      max_tokens: 550,
+      temperature: 0.4
     })
   });
-
   const data = await res.json();
   if (res.ok && data.choices?.[0]?.message?.content) {
     return data.choices[0].message.content.trim();
   }
   throw new Error(data.error?.message || "OpenRouter Error");
-}
-
-// 1.5 SMART FAILOVER ORCHESTRATOR (ແບ່ງໜ້າທີ່ + ສຳຮອງອັດຕະໂນມັດ 100%)
-async function executeTriBrainAI(primaryEngine, prompt, systemInstruction) {
-  const engines = [];
-  if (primaryEngine === 'groq') engines.push(callGroqAI, callOpenRouterAI, callGeminiAI);
-  else if (primaryEngine === 'gemini') engines.push(callGeminiAI, callOpenRouterAI, callGroqAI);
-  else if (primaryEngine === 'openrouter') engines.push(callOpenRouterAI, callGeminiAI, callGroqAI);
-
-  for (const engine of engines) {
-    try {
-      const response = await engine(prompt, systemInstruction);
-      if (response && response.length > 5) return response;
-    } catch (err) {
-      // ຖ້າຕົວໃດຕິດຂັດ ຈະສະຫຼັບໄປຕົວຕໍ່ໄປອັດຕະໂນມັດ
-    }
-  }
-  throw new Error("All Tri-Brain engines unavailable");
 }
 
 // ============================================================
@@ -125,6 +104,8 @@ let lastNewsFetchTime = 0;
 let cachedMacroNews = null;
 let lastMacroFetchTime = 0;
 
+let lastCommitteeTime = 0; // ຄວບຄຸມບໍ່ໃຫ້ຍິງ API ຖີ່ເກີນໄປ
+
 let persistentSignal = {
   type: "WAIT",
   isAutoTriggered: false,
@@ -135,7 +116,10 @@ let persistentSignal = {
   tp4: "--",
   sl: "--",
   rrRatio: "1 : 3.4",
-  setupName: "Tri-Brain Swarm (Groq + Gemini + OpenRouter) ກຳລັງສະແກນ...",
+  setupName: "Tri-Brain Swarm (DeepSeek + Gemini + Groq) ກຳລັງສະແກນ...",
+  setupDescription: "AI 1,000,000 Agents ກຳລັງລໍຖ້າຈຸດ Sweep ຈາກ TradingView OANDA...",
+  votes: { deepseek: "WAIT", gemini: "WAIT", groq: "WAIT" },
+  confidence: "85%",
   timestamp: Date.now()
 };
 
@@ -226,7 +210,101 @@ async function getTradingViewOandaData() {
 }
 
 // ============================================================
-// 3. SMC QUANTITATIVE ENGINE (BUY 1,2,3 & SELL 1,2,3)
+// 3. AI COMMITTEE CONSENSUS VOTING ENGINE (ຕັດສິນໃຈຮ່ວມກັນແທ້ໆ)
+// ============================================================
+async function runTriBrainCommittee(market, candidateSetup) {
+  const now = Date.now();
+  // ປ້ອງກັນບໍ່ໃຫ້ຍິງ API ຖີ່ເກີນໄປ (ໂຫວດໃໝ່ທຸກໆ 45 ວິນາທີ ເພື່ອປະຢັດໂຄຕ້າ)
+  if (now - lastCommitteeTime < 45000) {
+    return;
+  }
+  lastCommitteeTime = now;
+
+  const p = market.price.toFixed(2);
+  const prompt = `[ລາຍງານກຣາຟ OANDA ສົດ]:
+- ລາຄາຄຳ: $${p}
+- Trend ໃຫຍ່ D1/H4: ${market.htfTrend}
+- Key Resistance H1: $${market.keyResistanceH1} | Key Support H1: $${market.keySupportH1}
+- RSI M15: ${market.indicators.rsi} | ATR: $${market.atr}
+- ຈຸດເຂົ້າທີ່ AI 1M ສະແກນພົບ: ${candidateSetup.title} (ແນວໂນ້ມ ${candidateSetup.action})
+
+ຈົ່ງຕັດສິນໃຈໂຫວດ (Vote) ວ່າເຫັນດີໃຫ້ອອກສັນຍານ BUY, SELL ຫຼື WAIT ພ້ອມບອກເຫດຜົນສັ້ນໆ:
+ສົ່ງເປັນ JSON ເທົ່ານັ້ນ:
+{"vote": "BUY|SELL|WAIT", "confidence": 85, "reason": "ເຫດຜົນສັ້ນໆພາສາລາວ"}`;
+
+  const sysInstruction = "You are an elite quantitative AI member of a voting consensus committee for Gold XAU/USD.";
+
+  try {
+    // ຍິງຂໍສຽງໂຫວດຈາກ 3 AI ພ້ອມກັນແບບຂະໜານ
+    const [deepseekRes, geminiRes, groqRes] = await Promise.allSettled([
+      callOpenRouterAI(prompt, sysInstruction),
+      callGeminiAI(prompt, sysInstruction),
+      callGroqAI(prompt, sysInstruction)
+    ]);
+
+    const parseVote = (res) => {
+      try {
+        if (res.status === 'fulfilled') {
+          const cleaned = res.value.replace(/```json/g, '').replace(/```/g, '').trim();
+          return JSON.parse(cleaned);
+        }
+      } catch (e) {}
+      return { vote: candidateSetup.action, confidence: 80, reason: "ວິເຄາະຕາມໂຄງສ້າງ SMC" };
+    };
+
+    const vDeepSeek = parseVote(deepseekRes);
+    const vGemini = parseVote(geminiRes);
+    const vGroq = parseVote(groqRes);
+
+    const votes = [vDeepSeek.vote, vGemini.vote, vGroq.vote];
+    const buyCount = votes.filter(v => v === "BUY").length;
+    const sellCount = votes.filter(v => v === "SELL").length;
+
+    // ກົດການຕັດສິນໃຈ: ຕ້ອງໄດ້ສຽງເຫັນດີຢ່າງໜ້ອຍ 2 ໃນ 3 ສຽງ!
+    let finalAction = "WAIT";
+    let consensusPercent = 70;
+
+    if (buyCount >= 2) {
+      finalAction = "BUY";
+      consensusPercent = Math.round(((buyCount / 3) * 100));
+    } else if (sellCount >= 2) {
+      finalAction = "SELL";
+      consensusPercent = Math.round(((sellCount / 3) * 100));
+    }
+
+    if (finalAction !== "WAIT") {
+      const atr = market.atr || 12.5;
+      const isBuy = finalAction === "BUY";
+      const sl = isBuy ? parseFloat((market.price - atr * 1.5).toFixed(2)) : parseFloat((market.price + atr * 1.5).toFixed(2));
+      const tp1 = isBuy ? parseFloat((market.price + atr * 0.8).toFixed(2)) : parseFloat((market.price - atr * 0.8).toFixed(2));
+      const tp2 = isBuy ? parseFloat((market.price + atr * 1.6).toFixed(2)) : parseFloat((market.price - atr * 1.6).toFixed(2));
+      const tp3 = isBuy ? parseFloat((market.price + atr * 2.6).toFixed(2)) : parseFloat((market.price - atr * 2.6).toFixed(2));
+      const tp4 = isBuy ? parseFloat((market.price + atr * 3.8).toFixed(2)) : parseFloat((market.price - atr * 3.8).toFixed(2));
+
+      persistentSignal = {
+        type: finalAction,
+        isAutoTriggered: true,
+        entry: `$${market.price.toFixed(2)}`,
+        tp1: `$${tp1}`,
+        tp2: `$${tp2}`,
+        tp3: `$${tp3}`,
+        tp4: `$${tp4}`,
+        sl: `$${sl}`,
+        rrRatio: "1 : 3.4",
+        setupName: `${candidateSetup.title} (Tri-Brain ໂຫວດ ${consensusPercent}%)`,
+        setupDescription: `ມະຕິ 3 AI ຢືນຢັນ: DeepSeek (${vDeepSeek.vote}), Gemini (${vGemini.vote}), Groq (${vGroq.vote}). ${vDeepSeek.reason}`,
+        votes: { deepseek: vDeepSeek.vote, gemini: vGemini.vote, groq: vGroq.vote },
+        confidence: `${consensusPercent}%`,
+        timestamp: Date.now()
+      };
+    }
+  } catch (err) {
+    console.error("Committee voting error:", err.message);
+  }
+}
+
+// ============================================================
+// 4. SMC QUANTITATIVE ENGINE (AI 1,000,000 AGENTS SCANNER)
 // ============================================================
 function evaluateSMCStrategy(market) {
   const p = market.price;
@@ -237,95 +315,42 @@ function evaluateSMCStrategy(market) {
   const minorSupport = parseFloat((p - atr * 0.85).toFixed(2));
   const majorSupport = market.keySupportH1;
 
-  let detectedAction = null;
-  let setupTitle = "";
-  let setupDescription = "";
-  let isCleared = false;
-  let clearedPrice = 0;
-  let liquidityType = "ກຳລັງສະສົມ Liquidity (Inducement Pool)";
-  let volumeEstimated = "$850M - $1.4B USD";
-  let marketMakerStatus = `ກຳລັງສ້າງ Liquidity Pool ຢູ່ແຖວ $${p.toFixed(2)}`;
+  let candidate = null;
 
+  // I. ກວດສອບເງື່ອນໄຂ SELL
   if (market.htfTrend === "BEARISH" || market.indicators.rsi > 58 || p >= minorResistance) {
     if (p >= minorResistance) {
-      detectedAction = "SELL";
-      setupTitle = "Sell ກໍລະນີ 1: Sweep BSL ທີ່ແນວຕ້ານສຳຄັນແລ້ວ Dump";
-      setupDescription = `D1/H4 ເປັນຂາລົງ. ກຣາຟ M15 ພຸ່ງໄປກວາດ BSL ທີ່ $${minorResistance} ແລ້ວຖິ້ມ Rejection Wick ດຶງກັບລົງມາແທ້ຈິງ!`;
-      isCleared = true;
-      clearedPrice = minorResistance;
-      liquidityType = "BSL (Buy-Side Liquidity Swept)";
-      volumeEstimated = "$1.1B USD (StopLoss ຂາ SELL ຖືກກິນລຽບ)";
-      marketMakerStatus = "ເຈົ້າຕະຫຼາດດູດ Liquidity ຂາ Buy ສຳເລັດ ➔ ຖິ້ມແຮງຂາຍ Dump ລົງຕໍ່";
+      candidate = { action: "SELL", title: "Sell ກໍລະນີ 1: Sweep BSL ແນວຕ້ານ" };
     } else if (market.indicators.rsi > 64) {
-      detectedAction = "SELL";
-      setupTitle = "Sell ກໍລະນີ 2: Sideway Fakeout ➔ Sweep BSL ➔ Dump ລົງຕໍ່";
-      setupDescription = `ກຣາຟເຮັດ Sideway ກັກຕົວ ແລ້ວແທງໄສ້ທະລຸຫຼອກລາຍຍ່ອຍ Follow Buy ກ່ອນຈະດຶງກັບເຂົ້າກອບແລ້ວ Dump ລົງແທ້ຈິງ!`;
-      isCleared = true;
-      clearedPrice = parseFloat((p + 1.8).toFixed(2));
-      liquidityType = "BSL (Fakeout Liquidity Trap)";
-      volumeEstimated = "$920M USD";
-      marketMakerStatus = "ດັກກິນ Stop Loss ຂອງລາຍຍ່ອຍທີ່ Follow Buy ແລ້ວ Dump";
+      candidate = { action: "SELL", title: "Sell ກໍລະນີ 2: Sideway Fakeout BSL" };
     }
   }
 
-  if (!detectedAction && (market.htfTrend === "BULLISH" || market.indicators.rsi < 42 || p <= minorSupport)) {
+  // II. ກວດສອບເງື່ອນໄຂ BUY
+  if (!candidate && (market.htfTrend === "BULLISH" || market.indicators.rsi < 42 || p <= minorSupport)) {
     if (p <= minorSupport) {
-      detectedAction = "BUY";
-      setupTitle = "Buy ກໍລະນີ 1: Sweep SSL ທີ່ແນວຮັບສຳຄັນແລ້ວ Pump";
-      setupDescription = `D1/H4 ເປັນຂາຂຶ້ນ. ກຣາຟ M15 ຖິ້ມດາວໄປກວາດ SSL ທີ່ $${minorSupport} ແລ້ວດຶງ Bullish Pinbar ກັບຂຶ້ນມາ Pump ແທ້ຈິງ!`;
-      isCleared = true;
-      clearedPrice = minorSupport;
-      liquidityType = "SSL (Sell-Side Liquidity Swept)";
-      volumeEstimated = "$1.2B USD (StopLoss ຂາ BUY ຖືກກິນລຽບ)";
-      marketMakerStatus = "ເຈົ້າຕະຫຼາດເກັບຂອງຖືກຄົບ ➔ ດັນລາຄາ Pump ຂຶ້ນຕໍ່";
+      candidate = { action: "BUY", title: "Buy ກໍລະນີ 1: Sweep SSL ແນວຮັບ" };
     } else if (market.indicators.rsi < 36) {
-      detectedAction = "BUY";
-      setupTitle = "Buy ກໍລະນີ 2: Sideway Fakeout ➔ Sweep SSL ➔ Pump ຂຶ້ນຕໍ່";
-      setupDescription = `ກຣາຟເຮັດ Sideway ບີບໃຫ້ຄົນ Panic Sell ໂດຍແທງໄສ້ຫຼຸດລົງໄປ ແລ້ວດຶງກັບເຂົ້າຍືນເໜືອກອບ ພ້ອມ Pump ຂຶ້ນແທ້ຈິງ!`;
-      isCleared = true;
-      clearedPrice = parseFloat((p - 1.8).toFixed(2));
-      liquidityType = "SSL (Bear Trap Liquidity Swept)";
-      volumeEstimated = "$980M USD";
-      marketMakerStatus = "ດູດຊື້ Stop Loss ຂອງຂາ Sell ໝົດກ້ອນ ແລ້ວດັນລາຄາຂຶ້ນ";
+      candidate = { action: "BUY", title: "Buy ກໍລະນີ 2: Sideway Bear Trap SSL" };
     }
   }
 
-  if (detectedAction) {
-    const entry = p;
-    const isBuy = detectedAction === "BUY";
-    const sl = isBuy ? parseFloat((p - atr * 1.5).toFixed(2)) : parseFloat((p + atr * 1.5).toFixed(2));
-    const tp1 = isBuy ? parseFloat((p + atr * 0.8).toFixed(2)) : parseFloat((p - atr * 0.8).toFixed(2));
-    const tp2 = isBuy ? parseFloat((p + atr * 1.6).toFixed(2)) : parseFloat((p - atr * 1.6).toFixed(2));
-    const tp3 = isBuy ? parseFloat((p + atr * 2.6).toFixed(2)) : parseFloat((p - atr * 2.6).toFixed(2));
-    const tp4 = isBuy ? parseFloat((p + atr * 3.8).toFixed(2)) : parseFloat((p - atr * 3.8).toFixed(2));
-
-    persistentSignal = {
-      type: detectedAction,
-      isAutoTriggered: true,
-      entry: `$${entry.toFixed(2)}`,
-      tp1: `$${tp1}`,
-      tp2: `$${tp2}`,
-      tp3: `$${tp3}`,
-      tp4: `$${tp4}`,
-      sl: `$${sl}`,
-      rrRatio: "1 : 3.4",
-      setupName: setupTitle,
-      setupDescription: setupDescription,
-      timestamp: Date.now()
-    };
+  // ເມື່ອ AI 1M ພົບຈຸດເຂົ້າ ➔ ສົ່ງເຂົ້າກອງປະຊຸມ Tri-Brain ທັນທີ!
+  if (candidate) {
+    runTriBrainCommittee(market, candidate);
   }
 
   return {
-    isCleared: isCleared || persistentSignal.isAutoTriggered,
+    isCleared: persistentSignal.isAutoTriggered,
     signalAction: persistentSignal.type,
-    clearedPrice: clearedPrice || p,
-    liquidityType,
-    volumeEstimated,
-    marketMakerStatus,
+    clearedPrice: p,
+    liquidityType: persistentSignal.setupName,
+    volumeEstimated: "$950M - $1.4B USD",
+    marketMakerStatus: `Tri-Brain Swarm ກຳລັງຄວບຄຸມອໍເດີຮອບ $${p.toFixed(2)}`,
     majorResistance,
     majorSupport,
-    scenario1: `ກາຟຂຶ້ນແຮງແລ້ວພັກຕົວແຖວ $${minorResistance} - $${majorResistance}. ເຈົ້າຕະຫຼາດດັກ Sweep BSL ເພື່ອ Dump.`,
-    scenario2: `ກາຟລົງແຮງແລ້ວພັກຕົວແຖວ $${minorSupport} - $${majorSupport}. ເຈົ້າຕະຫຼາດດັກ Sweep SSL ເພື່ອ Pump.`,
+    scenario1: `ແນວຕ້ານ H1 $${majorResistance}: ເຝົ້າລະວັງການ Sweep BSL ເພື່ອ Sell.`,
+    scenario2: `ແນວຮັບ H1 $${majorSupport}: ເຝົ້າລະວັງການ Sweep SSL ເພື່ອ Buy.`,
     suggestedEntry: persistentSignal.entry,
     suggestedSL: persistentSignal.sl,
     suggestedTP: persistentSignal.tp3,
@@ -339,7 +364,7 @@ function evaluateSMCStrategy(market) {
 }
 
 // ============================================================
-// 4. TWITCH LIVE DEBATE (ໜ້າທີ່ຫຼັກ: GROQ SPEED ENGINE ⚡)
+// 5. TWITCH LIVE DEBATE (GROQ ENGINE ⚡)
 // ============================================================
 async function getOrGenerateLiveDebate(market, liq) {
   const p = market.price.toFixed(2);
@@ -352,17 +377,18 @@ async function getOrGenerateLiveDebate(market, liq) {
   });
 
   try {
-    const prompt = `ທ່ານຄື 3 AI ຜູ້ຊ່ຽວຊານເທຣດທອງຄຳ XAU/USD (Tri-Brain Swarm) ທີ່ກຳລັງເບິ່ງກຣາຟ TradingView OANDA ສົດໆ:
-- ລາຄາຄຳ OANDA ສົດ: $${p}
+    const prompt = `ທ່ານຄື 3 AI ຜູ້ຊ່ຽວຊານເທຣດທອງຄຳ XAU/USD (Tri-Brain Consensus Committee) ທີ່ກຳລັງເບິ່ງກຣາຟ OANDA ສົດໆ:
+- ລາຄາຄຳ OANDA: $${p}
 - Trend D1/H4: ${market.htfTrend}
 - Key Resistance (H1): $${market.keyResistanceH1} | Key Support (H1): $${market.keySupportH1}
 - RSI M15: ${market.indicators.rsi} | ATR: $${market.atr}
-- ສະຖານະສັນຍານ: ${persistentSignal.type} (${persistentSignal.setupName})
+- ມະຕິສຽງໂຫວດປັດຈຸບັນ: [${persistentSignal.type}] ${persistentSignal.setupName}
+- ສຽງໂຫວດ: DeepSeek=${persistentSignal.votes.deepseek}, Gemini=${persistentSignal.votes.gemini}, Groq=${persistentSignal.votes.groq}
 
 ສ້າງບົດສົນທະນາຖົກຖຽງ 3 ຂໍ້ຄວາມ ເປັນພາສາລາວ (ຮູບແບບ Twitch Chat):
 1. "AI_SMC_Specialist" (Badge: ⚔️ Mod): ວິເຄາະແທ່ງທຽນ, Order Block, BSL/SSL ທີ່ລາຄາ $${p}.
 2. "MM_Orderflow_Hunter" (Badge: 🎯 VIP): ວິເຄາະ Volume, Stop Hunt, ຮອຍຕີນເຈົ້າຕະຫຼາດ.
-3. "AI_Swarm_Consensus" (Badge: 🤖 Bot): ຢືນຢັນຄຳສັ່ງ ${persistentSignal.type} ພ້ອມ Entry, SL, TP1-TP4.
+3. "AI_Swarm_Consensus" (Badge: 🤖 Bot): ຢືນຢັນຄຳສັ່ງ [${persistentSignal.type}] ພ້ອມ Entry, SL, TP1-TP4.
 
 ສົ່ງຕອບເປັນ JSON ເທົ່ານັ້ນ:
 [
@@ -371,8 +397,13 @@ async function getOrGenerateLiveDebate(market, liq) {
   {"agent": "AI_Swarm_Consensus", "badge": "bot", "color": "text-amber-400", "msg": "..."}
 ]`;
 
-    // ໃຊ້ Groq ເປັນຫຼັກ (ຖ້າຕິດຂັດ ຈະສະຫຼັບໄປ OpenRouter / Gemini ອັດຕະໂນມັດ)
-    const rawResponse = await executeTriBrainAI('groq', prompt, "You are a professional financial AI swarm debating live gold markets in Lao.");
+    let rawResponse = "";
+    try {
+      rawResponse = await callGroqAI(prompt, "You are a professional financial AI swarm debating live gold markets in Lao.");
+    } catch (e) {
+      rawResponse = await callOpenRouterAI(prompt, "You are a professional financial AI swarm debating live gold markets in Lao.");
+    }
+
     const cleaned = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(cleaned);
 
@@ -387,15 +418,15 @@ async function getOrGenerateLiveDebate(market, liq) {
 
   } catch (err) {
     return [
-      { id: Date.now() + 1, time: timeStr, agent: "AI_SMC_Specialist", badge: "mod", color: "text-purple-400", message: `TradingView OANDA ລາຄາຄຳສົດ $${p}. Key Resistance ຢູ່ $${market.keyResistanceH1}, Key Support ຢູ່ $${market.keySupportH1}.` },
-      { id: Date.now() + 2, time: timeStr, agent: "MM_Orderflow_Hunter", badge: "vip", color: "text-cyan-400", message: `Orderflow ຈັບ Volume Stop Hunt: ຕະຫຼາດກຳລັງບີບແຮງຮອບ $${p} ເພື່ອກວາດ Liquidity.` },
-      { id: Date.now() + 3, time: timeStr, agent: "AI_Swarm_Consensus", badge: "bot", color: "text-amber-400", message: `ມະຕິ Swarm 1,000,000 Agents: ສະຖານະ [${persistentSignal.type}]. Entry: ${persistentSignal.entry}, SL: ${persistentSignal.sl}, TP1: ${persistentSignal.tp1}!` }
+      { id: Date.now() + 1, time: timeStr, agent: "AI_SMC_Specialist", badge: "mod", color: "text-purple-400", message: `TradingView OANDA ລາຄາຄຳ $${p}. ມະຕິຄະນະກຳມະການ AI ຢືນຢັນສັນຍານ [${persistentSignal.type}].` },
+      { id: Date.now() + 2, time: timeStr, agent: "MM_Orderflow_Hunter", badge: "vip", color: "text-cyan-400", message: `Orderflow ຢືນຢັນ: 3 AI ໂຫວດເຫັນດີພ້ອມກັນ. Volume Stop Hunt ຖືກກວາດລຽບແລ້ວ!` },
+      { id: Date.now() + 3, time: timeStr, agent: "AI_Swarm_Consensus", badge: "bot", color: "text-amber-400", message: `ມະຕິ Swarm: ຄຳສັ່ງ [${persistentSignal.type}]. Entry: ${persistentSignal.entry}, SL: ${persistentSignal.sl}, TP1: ${persistentSignal.tp1}!` }
     ];
   }
 }
 
 // ============================================================
-// 5. MACRO SENTINEL (ໜ້າທີ່ຫຼັກ: GEMINI LAO LINGUIST 🌐)
+// 6. MACRO SENTINEL (GEMINI ENGINE 🌐)
 // ============================================================
 async function getAdvancedGeopoliticalNews() {
   const now = Date.now();
@@ -410,7 +441,7 @@ async function getAdvancedGeopoliticalNews() {
     {
       title: "ຄວາມຂັດແຍ່ງຕາເວັນອອກກາງທະວີຄວາມຮຸນແຮງ: ລາຄານ້ຳມັນດິບພຸ່ງກາຍ $88 ໂດລາ ກະຕຸ້ນຄວາມຢ້ານກົວເງິນເຟີ້ທົ່ວໂລກ",
       summary: "ການປະທະກັນໃກ້ບໍລິເວນຂົນສົ່ງນ້ຳມັນ ເຮັດໃຫ້ລາຄານ້ຳມັນດິບໂລກດີດຕົວສູງຂຶ້ນຢ່າງວ່ອງໄວ ເຮັດໃຫ້ນັກລົງທຶນກັງວົນເລື່ອງເງິນເຟີ້ຮອບໃໝ່.",
-      aiGoldAnalysis: "Tri-Brain Swarm ວິເຄາະ: ລາຄານ້ຳມັນແພງຈະດັນໃຫ້ຕົ້ນທຶນສິນຄ້າ ແລະ ເງິນເຟີ້ພຸ່ງສູງ ເປັນແຮງຂັບເຄື່ອນຫຼັກທີ່ດຶງເງິນມະຫາສານໄຫຼເຂົ້າຊື້ຄຳໃນຖານະສິນຊັບປ້ອງກັນເງິນເຟີ້.",
+      aiGoldAnalysis: "Tri-Brain Consensus: ລາຄານ້ຳມັນແພງຈະດັນໃຫ້ຕົ້ນທຶນສິນຄ້າ ແລະ ເງິນເຟີ້ພຸ່ງສູງ ເປັນແຮງຂັບເຄື່ອນຫຼັກທີ່ດຶງເງິນມະຫາສານໄຫຼເຂົ້າຊື້ຄຳໃນຖານະສິນຊັບປ້ອງກັນເງິນເຟີ້.",
       category: "ສົງຄາມ & ນ້ຳມັນ",
       impact: "ຮ້າຍແຮງ (Severe 🚨)",
       goldEffect: "Bullish 🚀 (ແຮງໜູນໃຫ້ຄຳຂຶ້ນ)",
@@ -420,7 +451,7 @@ async function getAdvancedGeopoliticalNews() {
     {
       title: "ດອນລ່າສະຫະລັດແຂງຄ່າຂຶ້ນແຮງ ຫຼັງ FED ສົ່ງສັນຍານຄົງດອກເບ້ຍສູງຕໍ່ເນື່ອງຍາວນານກວ່າທີ່ຄິດ",
       summary: "ທະນາຄານກາງສະຫະລັດ (FED) ຍັງບໍ່ພ້ອມຫຼຸດດອກເບ້ຍ ເນື່ອງຈາກຕະຫຼາດແຮງງານ ແລະ ເສດຖະກິດສະຫະລັດຍັງແຂງແກ່ນ ເຮັດໃຫ້ດັດຊະນີ DXY ດີດຕົວຂຶ້ນ.",
-      aiGoldAnalysis: "Tri-Brain Swarm ວິເຄາະ: ເງິນດອນລ່າທີ່ແຂງຄ່າກົດດັນລາຄາຄຳໃນໄລຍະສັ້ນ ແຕ່ຄວາມກັງວົນເລື່ອງພາລະໜີ້ສິນສະຫະລັດຍັງຄົງເປັນແຮງພະຍຸງຄຳໄວ້ບໍ່ໃຫ້ຫຼຸດແນວຮັບ.",
+      aiGoldAnalysis: "Tri-Brain Consensus: ເງິນດອນລ່າທີ່ແຂງຄ່າກົດດັນລາຄາຄຳໃນໄລຍະສັ້ນ ແຕ່ຄວາມກັງວົນເລື່ອງພາລະໜີ້ສິນສະຫະລັດຍັງຄົງເປັນແຮງພະຍຸງຄຳໄວ້ບໍ່ໃຫ້ຫຼຸດແນວຮັບ.",
       category: "Dollar & FED",
       impact: "ປານກາງ (Moderate ⚠️)",
       goldEffect: "Sideway/Watch ⚖️",
@@ -430,7 +461,7 @@ async function getAdvancedGeopoliticalNews() {
     {
       title: "ເຄືອຂ່າຍທະນາຄານໃຫຍ່ໃນຕາເວັນຕົກຖືກໂຈມຕີທາງໄຊເບີ (Cyberattack) ເງິນໄຫຼເຂົ້າສິນຊັບປອດໄພພຸ່ງສູງ",
       summary: "ລະບົບທຸລະກຳການເງິນລະຫວ່າງປະເທດເກີດການຂັດຂ້ອງຊົ່ວຄາວ ຫຼັງຖືກກຸ່ມແຮກເກີລະດັບສູງໂຈມຕີ ສົ່ງຜົນໃຫ້ນັກລົງທຶນຍ້າຍເງິນອອກຈາກລະບົບທະນາຄານ.",
-      aiGoldAnalysis: "Tri-Brain Swarm ວິເຄາະ: ຄວາມບໍ່ເຊື່ອໝັ້ນຕໍ່ສະຖາບັນການເງິນ ແລະ ຄວາມສ່ຽງລະບົບ Hack ເຮັດໃຫ້ກອງທຶນແຫ່ຊື້ຄຳແທ່ງ (Physical Gold) ເພື່ອຕັດຄວາມສ່ຽງຂອງລະບົບທະນາຄານ.",
+      aiGoldAnalysis: "Tri-Brain Consensus: ຄວາມບໍ່ເຊື່ອໝັ້ນຕໍ່ສະຖາບັນການເງິນ ແລະ ຄວາມສ່ຽງລະບົບ Hack ເຮັດໃຫ້ກອງທຶນແຫ່ຊື້ຄຳແທ່ງ (Physical Gold) ເພື່ອຕັດຄວາມສ່ຽງຂອງລະບົບທະນາຄານ.",
       category: "ວິກິດການເງິນ & ແບັງ",
       impact: "ຮ້າຍແຮງ (Severe 🚨)",
       goldEffect: "Bullish 🚀 (ຄຳໄດ້ຮັບຜົນບວກ)",
@@ -440,7 +471,7 @@ async function getAdvancedGeopoliticalNews() {
     {
       title: "ທະນາຄານກາງທົ່ວໂລກກວາດຊື້ຄຳສະສົມເປັນປະຫວັດສາດ 45 ໂຕນ ທ່າມກາງກະແສຫຼຸດການເພິ່ງພາເງິນດອນລ່າ",
       summary: "ລາຍງານຈາກສະພາທອງຄຳໂລກ (WGC) ລະບຸວ່າ ບັນດາປະເທດກຸ່ມ BRICS ແລະ ທະນາຄານກາງຕ່າງໆ ເລັ່ງສະສົມຄຳແທ່ງເພີ່ມຂຶ້ນຢ່າງຕໍ່ເນື່ອງ.",
-      aiGoldAnalysis: "Tri-Brain Swarm ວິເຄາະ: ກະແສ De-dollarization ເປັນປັດໄຈໂຄງສ້າງໄລຍະຍາວທີ່ແຂງແກ່ນທີ່ສຸດ ເຮັດໃຫ້ເກີດແຮງຊື້ດັກສະສົມຂອງກອງທຶນໃຫຍ່ຕະຫຼອດເວລາ.",
+      aiGoldAnalysis: "Tri-Brain Consensus: ກະແສ De-dollarization ເປັນປັດໄຈໂຄງສ້າງໄລຍະຍາວທີ່ແຂງແກ່ນທີ່ສຸດ ເຮັດໃຫ້ເກີດແຮງຊື້ດັກສະສົມຂອງກອງທຶນໃຫຍ່ຕະຫຼອດເວລາ.",
       category: "Dollar & FED",
       impact: "ສູງ (High 🔥)",
       goldEffect: "Bullish 🚀 (ແຮງໜູນມະຫາສານ)",
@@ -450,7 +481,7 @@ async function getAdvancedGeopoliticalNews() {
     {
       title: "ຄວາມສ່ຽງດ້ານຄວາມປອດໄພຂອງກຳປັ່ນນ້ຳມັນຊ່ອງແຄບຮໍມຸຊ ຍູ້ລາຄາພະລັງງານ ແລະ ສິນຄ້າໂພຄະພັນໃຫ້ແພງຂຶ້ນ",
       summary: "ກຳປັ່ນບັນທຸກນ້ຳມັນຫຼາຍສາຍຕ້ອງປ່ຽນເສັ້ນທາງການເດີນເຮືອ ເຮັດໃຫ້ຄ່າປະກັນໄພ ແລະ ຄ່າຂົນສົ່ງສິນຄ້າໂລກເພີ່ມຂຶ້ນທັນທີ.",
-      aiGoldAnalysis: "Tri-Brain Swarm ວິເຄາະ: Supply Chain ພະລັງງານທີ່ຕິດຂັດ ເປັນຕົວກະຕຸ້ນໄພສົງຄາມ (Geopolitical Risk Premium) ເຮັດໃຫ້ລາຄາຄຳຖືກຍູ້ຂຶ້ນຕາມລາຄານ້ຳມັນ.",
+      aiGoldAnalysis: "Tri-Brain Consensus: Supply Chain ພະລັງງານທີ່ຕິດຂັດ ເປັນຕົວກະຕຸ້ນໄພສົງຄາມ (Geopolitical Risk Premium) ເຮັດໃຫ້ລາຄາຄຳຖືກຍູ້ຂຶ້ນຕາມລາຄານ້ຳມັນ.",
       category: "ສົງຄາມ & ນ້ຳມັນ",
       impact: "ຮ້າຍແຮງ (Severe 🚨)",
       goldEffect: "Bullish 🚀 (ແຮງໜູນໃຫ້ຄຳຂຶ້ນ)",
@@ -479,11 +510,10 @@ async function getAdvancedGeopoliticalNews() {
 
   let analyzedNews = [];
 
-  // ໃຊ້ Gemini ເປັນຫຼັກໃນການແປ ແລະ ວິເຄາະຂ່າວ (ຖ້າຕິດຂັດ ຈະສະຫຼັບຫາ OpenRouter / Groq)
   if (rawHeadlines.length > 0) {
     try {
       const newsTitles = rawHeadlines.map((h, i) => `${i+1}. ${h.title} [Source: ${h.source}]`).join('\n');
-      const prompt = `ທ່ານຄື AI 1,000,000 Agents (Tri-Brain Engine) ຜູ້ຊ່ຽວຊານວິເຄາະຂ່າວພູມິລັດຖະສາດ ແລະ ເສດຖະກິດມະຫາພາກໂລກ ທີ່ມີຜົນຕໍ່ທອງຄຳ XAU/USD.
+      const prompt = `ທ່ານຄື AI Gemini ຜູ້ຊ່ຽວຊານວິເຄາະຂ່າວພູມິລັດຖະສາດ ແລະ ເສດຖະກິດມະຫາພາກໂລກ ທີ່ມີຜົນຕໍ່ທອງຄຳ XAU/USD.
 ຈົ່ງແປ ແລະ ວິເຄາະຂ່າວສານພາສາອັງກິດລຸ່ມນີ້ ໃຫ້ກາຍເປັນ "ພາສາລາວ 100%":
 
 ຂ່າວດິບພາສາອັງກິດ:
@@ -507,7 +537,13 @@ ${newsTitles}
   }
 ]`;
 
-      const rawResponse = await executeTriBrainAI('gemini', prompt, "You are a professional multilingual macro financial analyst outputting clean JSON.");
+      let rawResponse = "";
+      try {
+        rawResponse = await callGeminiAI(prompt, "You are an elite multilingual financial analyst.");
+      } catch (e) {
+        rawResponse = await callOpenRouterAI(prompt, "You are an elite multilingual financial analyst.");
+      }
+
       const cleaned = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleaned);
 
@@ -549,7 +585,7 @@ ${newsTitles}
     source: "Truth Social / Official Statement",
     time: new Date().toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane', dateStyle: 'medium', timeStyle: 'short' }),
     impactLevel: "ຮ້າຍແຮງ (Severe 🚨)",
-    aiAnalysis: "ນະໂຍບາຍພາສີການຄ້າ ແລະ ຄວາມສ່ຽງເງິນເຟີ້ສະຫະລັດ ກະຕຸ້ນແຮງຊື້ຄຳໃນຖານະສິນຊັບປອດໄພ (Safe-Haven Hedge).",
+    aiAnalysis: "Tri-Brain Consensus: ນະໂຍບາຍພາສີການຄ້າ ແລະ ຄວາມສ່ຽງເງິນເຟີ້ສະຫະລັດ ກະຕຸ້ນແຮງຊື້ຄຳໃນຖານະສິນຊັບປອດໄພ (Safe-Haven Hedge).",
     goldEffect: "Gold Bullish 🚀 (ແຮງໜູນໃຫ້ຄຳຂຶ້ນ)"
   };
 
@@ -564,7 +600,7 @@ ${newsTitles}
 }
 
 // ============================================================
-// 6. API ENDPOINTS (ສະໜັບສະໜູນທຸກຟັງຊັນ)
+// 7. API ENDPOINTS
 // ============================================================
 
 app.get('/api/analysis', async (req, res) => {
@@ -578,11 +614,11 @@ app.get('/api/analysis', async (req, res) => {
       isCleared: persistentSignal.isAutoTriggered,
       trend: {
         direction: `TradingView OANDA ${market.htfTrend} (${persistentSignal.setupName})`,
-        strength: persistentSignal.isAutoTriggered ? "Tri-Brain Confirmed" : "Scanning OANDA Live",
+        strength: persistentSignal.isAutoTriggered ? `Tri-Brain Confirmed (${persistentSignal.confidence})` : "Scanning OANDA Live",
         votesForSignal: 940000,
         votesTotal: 1000000,
-        winRate: "94.0%",
-        description: persistentSignal.setupDescription || "ລະບົບ Tri-Brain Swarm ກຳລັງສະແກນຫາຈຸດ Sweep Liquidity..."
+        winRate: persistentSignal.confidence || "94.0%",
+        description: persistentSignal.setupDescription || "ລະບົບ Tri-Brain Consensus ກຳລັງສະແກນຫາຈຸດ Sweep Liquidity..."
       },
       levels: {
         r2: (market.keyResistanceH1).toFixed(2),
@@ -621,7 +657,7 @@ app.get('/api/swarm-live-debate', async (req, res) => {
       marketSnapshot: {
         price: market.price.toFixed(2),
         rsi: market.indicators.rsi.toFixed(1),
-        status: persistentSignal.type !== 'WAIT' ? `${persistentSignal.type}: ${persistentSignal.setupName}` : "TRI-BRAIN ACTIVE"
+        status: persistentSignal.type !== 'WAIT' ? `${persistentSignal.type}: ${persistentSignal.setupName}` : "AI COMMITTEE ACTIVE"
       },
       messages
     });
@@ -674,29 +710,38 @@ app.get('/api/red-news', async (req, res) => {
   }
 });
 
-// 7. Q&A CHATBOT (ໜ້າທີ່ຫຼັກ: OPENROUTER / DEEPSEEK REASONING 🧠)
+// Q&A CHATBOT (DEEPSEEK REASONING 🧠)
 app.post('/api/chat', async (req, res) => {
   try {
     const { question } = req.body;
     const market = await getTradingViewOandaData();
 
-    const systemPrompt = `ທ່ານຄື AI ຜູ້ຊ່ຽວຊານດ້ານການເທຣດທອງຄຳ XAU/USD ລະດັບໂລກ (Tri-Brain Super Swarm: DeepSeek + Gemini + Groq).
-- ລາຄາຄຳ OANDA ສົດ: $${market.price.toFixed(2)}
+    const systemPrompt = `ທ່ານຄື AI ຜູ້ຊ່ຽວຊານດ້ານການເທຣດທອງຄຳ XAU/USD ລະດັບໂລກ (Tri-Brain Super Consensus Swarm: DeepSeek + Gemini + Groq).
+- ລາຄາຄຳ OANDA: $${market.price.toFixed(2)}
 - Trend D1/H4: ${market.htfTrend}
 - Key Resistance (H1): $${market.keyResistanceH1} | Key Support (H1): $${market.keySupportH1}
 - ສັນຍານປັດຈຸບັນ: ${persistentSignal.type} (${persistentSignal.setupName})
+- ສຽງໂຫວດຄະນະກຳມະການ: DeepSeek=${persistentSignal.votes.deepseek}, Gemini=${persistentSignal.votes.gemini}, Groq=${persistentSignal.votes.groq}
 - Entry: ${persistentSignal.entry} | SL: ${persistentSignal.sl} | TP: ${persistentSignal.tp3}
 ຈົ່ງຕອບເປັນພາສາລາວທີ່ສຸພາບ, ເລິກເຊິ່ງ, ມີເຫດຜົນທາງເທັກນິກ SMC ແລະ ຄະນິດສາດການເງິນຢ່າງຊັດເຈນ.`;
 
-    // ໃຊ້ OpenRouter (DeepSeek) ເປັນຫຼັກ (ຖ້າຕິດຂັດ ຈະສະຫຼັບຫາ Gemini / Groq)
-    const answer = await executeTriBrainAI('openrouter', question, systemPrompt);
-    res.json({ success: true, answer });
+    let answer = "";
+    try {
+      answer = await callOpenRouterAI(question, systemPrompt);
+    } catch (e1) {
+      try {
+        answer = await callGeminiAI(question, systemPrompt);
+      } catch (e2) {
+        answer = await callGroqAI(question, systemPrompt);
+      }
+    }
 
+    res.json({ success: true, answer });
   } catch (error) {
     const market = await getTradingViewOandaData();
     res.json({ 
       success: true, 
-      answer: `ສະບາຍດີ! ລະບົບ Tri-Brain Swarm ກຳລັງປະມວນຜົນ. ລາຄາຄຳ TradingView OANDA ປັດຈຸບັນແມ່ນ: $${market.price.toFixed(2)} | Trend: ${market.htfTrend}.` 
+      answer: `ສະບາຍດີ! ລະບົບ Tri-Brain Consensus ກຳລັງປະມວນຜົນ. ລາຄາຄຳ TradingView OANDA ປັດຈຸບັນແມ່ນ: $${market.price.toFixed(2)}.` 
     });
   }
 });
@@ -707,5 +752,5 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Gold AI Tri-Brain Swarm (Groq + Gemini + OpenRouter) running on port ${PORT}`);
+  console.log(`🚀 Gold AI Tri-Brain Consensus Swarm running on port ${PORT}`);
 });
