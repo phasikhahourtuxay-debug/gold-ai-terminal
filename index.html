@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts: Phetsarath OT & JetBrains Mono -->
+    <!-- Google Fonts: Phetsarath & JetBrains Mono -->
     <link href="https://fonts.googleapis.com/css2?family=Phetsarath:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     
     <style>
@@ -35,7 +35,7 @@
 </head>
 <body class="p-3 md:p-6">
 
-    <!-- Audio Element ດຶງໄຟລ໌ alert.mp3 ທີ່ຢູ່ໃນ GitHub ແບບຖາວອນ -->
+    <!-- Audio Element ສຳລັບຫຼິ້ນສຽງແຈ້ງເຕືອນ -->
     <audio id="audio-alert-player" src="/alert.mp3" loop preload="auto"></audio>
 
     <!-- Header & AI Swarm Status -->
@@ -48,17 +48,17 @@
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-3 mt-3 md:mt-0 text-xs md:text-sm">
-            <!-- ປຸ່ມເລືອກເພງ ແລະ ສະແດງສະຖານະເພງຖາວອນ -->
+            <!-- ປຸ່ມເລືອກເພງ ແລະ ສະແດງສະຖານະ -->
             <div class="bg-gray-800 px-3 py-1.5 rounded-xl border border-gray-700 flex items-center gap-2">
                 <i class="fa-solid fa-music text-purple-400"></i>
                 <label for="custom-audio-file" class="cursor-pointer text-xs text-yellow-300 hover:text-white underline">
-                    ປ່ຽນເພງແຈ້ງເຕືອນ (MP3)
+                    ປ່ຽນເພງແຈ້ງເຕືອນ
                 </label>
                 <input type="file" id="custom-audio-file" accept="audio/*" class="hidden" onchange="loadCustomAudio(event)">
-                <span id="audio-name-badge" class="text-[11px] text-emerald-400 font-bold max-w-[120px] truncate">(alert.mp3 ຖາວອນ)</span>
+                <span id="audio-name-badge" class="text-[11px] text-emerald-400 font-bold max-w-[120px] truncate">(alert.mp3)</span>
             </div>
 
-            <!-- ກ່ອງນັບຖອຍຫຼັງສຽງເຕືອນ 5 ນາທີ & ປຸ່ມປິດສຽງ -->
+            <!-- ກ່ອງນັບຖອຍຫຼັງສຽງເຕືອນ 5 ນາທີ -->
             <div id="sound-timer-badge" class="hidden bg-red-950/80 border border-red-500/60 px-3 py-1.5 rounded-xl flex items-center gap-2">
                 <i class="fa-solid fa-volume-high text-red-400 animate-bounce"></i>
                 <span class="text-xs text-red-300 font-mono">ສຽງເຕືອນ: <b id="sound-timer-countdown">05:00</b></span>
@@ -115,7 +115,6 @@
                     <span class="text-sm md:text-base font-bold text-yellow-400 flex items-center gap-2">
                         <i class="fa-solid fa-chart-line"></i> ກາຟທອງຄຳປະຈຸບັນ XAU/USD (Live Feed M15)
                     </span>
-                    <!-- ປ່ອງສະແດງລາຄາສົດ OANDA:XAUUSD 100% ຕົງກັບແທ່ງທຽນ -->
                     <div class="flex items-center gap-2 bg-gray-800/90 border border-yellow-500/40 px-3 py-1 rounded-xl">
                         <span class="text-xs text-yellow-400 font-mono">OANDA Live:</span>
                         <iframe 
@@ -171,7 +170,7 @@
                 </div>
             </div>
 
-            <!-- Dynamic Signal Card (AUTO ຊິ້ງຄ໌ກັບ 1M Hunter) -->
+            <!-- Dynamic Signal Card -->
             <div id="signal-card" class="bg-gray-900 border-2 border-yellow-500/40 p-5 rounded-2xl glow-gold transition-all duration-300">
                 <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                     <div class="flex items-center gap-2">
@@ -238,7 +237,7 @@
                 <div class="flex-grow overflow-y-auto custom-scroll space-y-3 pr-1 text-xs" id="user-qa-box">
                     <div class="bg-gray-800/80 p-3 rounded-xl border border-gray-700 text-gray-200">
                         <b class="text-yellow-400 block mb-1"><i class="fa-solid fa-brain"></i> AI Assistant:</b>
-                        ສະບາຍດີ! ຕອນນີ້ລະບົບສັນຍານໜ້າຫຼັກໄດ້ຖືກຊິ້ງຄ໌ກັບ <b>Clear Liquidity 1M Hunter</b> ແບບ 100% ແລ້ວ. ຖາມລາຄາ ແລະ ສະຖານະກຣາຟໄດ້ເລີຍ!
+                        ສະບາຍດີ! ລະບົບສັນຍານໜ້າຫຼັກໄດ້ຖືກຊິ້ງຄ໌ກັບ <b>Clear Liquidity 1M Hunter</b> ແບບ Real-time ແລ້ວ. ສາມາດພິມຖາມລາຄາ ແລະ ທິດທາງກຣາຟໄດ້ເລີຍ!
                     </div>
                 </div>
                 <form id="chat-form" class="mt-2.5 flex gap-2" onsubmit="handleUserChatSubmit(event)">
@@ -422,13 +421,21 @@
         let activeTab = 'main';
 
         // ==========================================
-        // ລະບົບສຽງແຈ້ງເຕືອນ 5 ນາທີ (ດຶງ alert.mp3 ຖາວອນ)
+        // ລະບົບສຽງແຈ້ງເຕືອນ & Unlock Autoplay
         // ==========================================
-        let customAudioUrl = "/alert.mp3"; // ຕັ້ງ alert.mp3 ເປັນເພງຫຼັກຖາວອນ
+        let customAudioUrl = "/alert.mp3";
         let isSoundPlaying = false;
         let soundTimerInterval = null;
         let soundTimeRemaining = 300;
         let lastSweepTriggerId = null;
+
+        // ປົດລັອກສຽງອັດຕະໂນມັດເມື່ອຜູ້ໃຊ້ກົດຄລິກຄັ້ງທຳອິດເທິງໜ້າເວັບ
+        document.addEventListener('click', () => {
+            const player = document.getElementById('audio-alert-player');
+            if (player && player.paused && !isSoundPlaying) {
+                player.load();
+            }
+        }, { once: true });
 
         function loadCustomAudio(event) {
             const file = event.target.files[0];
@@ -438,7 +445,7 @@
                 const player = document.getElementById('audio-alert-player');
                 player.src = customAudioUrl;
                 document.getElementById('audio-name-badge').innerText = `(${file.name.substring(0, 10)}...)`;
-                alert(`ປ່ຽນເພງແຈ້ງເຕືອນຊົ່ວຄາວສຳເລັດ: ${file.name}`);
+                alert(`ປ່ຽນເພງແຈ້ງເຕືອນສຳເລັດ: ${file.name}`);
             }
         }
 
@@ -461,7 +468,7 @@
         function start5MinuteAlertSound() {
             if (isSoundPlaying) return;
             isSoundPlaying = true;
-            soundTimeRemaining = 300; // 5 ນາທີ = 300 ວິນາທີ
+            soundTimeRemaining = 300;
 
             const badge = document.getElementById('sound-timer-badge');
             const countdownEl = document.getElementById('sound-timer-countdown');
@@ -470,14 +477,14 @@
             const player = document.getElementById('audio-alert-player');
             player.currentTime = 0;
             player.play().catch(e => {
-                console.log("Custom audio error, fallback synth:", e);
+                console.log("Audio autoplay prevented, using fallback synth:", e);
+                playFallbackSynthSiren();
             });
 
             clearInterval(soundTimerInterval);
             soundTimerInterval = setInterval(() => {
                 soundTimeRemaining--;
 
-                // ຖ້າໄຟລ໌ເພງຫຼິ້ນບໍ່ໄດ້ ໃຫ້ຍິງສຽງ Siren ສັງເຄາະສຳຮອງ
                 if (player.paused && soundTimeRemaining % 2 === 0) {
                     playFallbackSynthSiren();
                 }
@@ -602,7 +609,7 @@
         }
 
         // ==========================================
-        // LIQUIDITY HUNTER & ສຽງເຕືອນ 5 ນາທີ
+        // LIQUIDITY HUNTER & Canvas
         // ==========================================
         async function fetchLiquidityAnalysis() {
             try {
@@ -714,7 +721,7 @@
         }
 
         // ==========================================
-        // Q&A Chatbot, Canvas & ຂ່າວ
+        // Q&A Chatbot, Geopolitics & News
         // ==========================================
         async function handleUserChatSubmit(e) {
             e.preventDefault();
@@ -737,7 +744,7 @@
             qaBox.innerHTML += `
                 <div id="${loadingId}" class="bg-gray-800 p-2.5 rounded-xl border border-gray-700 text-gray-400 flex items-center gap-2">
                     <i class="fa-solid fa-spinner fa-spin text-amber-400"></i>
-                    <span>AI ກຳລັງວິເຄາະກຣາຟສົດ ແລະ ຕອບ...</span>
+                    <span>AI ກຳລັງວິເຄາະກຣາຟ ແລະ ຕອບ...</span>
                 </div>
             `;
             qaBox.scrollTop = qaBox.scrollHeight;
@@ -896,11 +903,11 @@
         fetchLiquidityAnalysis();
         fetchAutoBotDebate();
 
-        setInterval(fetchAnalysis, 2500);         // ຊິ້ງຄ໌ສັນຍານທຸກໆ 2.5 ວິນາທີ
-        setInterval(fetchLiquidityAnalysis, 3500);// ກວດສອບ Liquidity Hunt ທຸກໆ 3.5 ວິນາທີ
-        setInterval(fetchAutoBotDebate, 6000);    // AI Debate ວິເຄາະກຣາຟສົດທຸກໆ 6 ວິນາທີ
-        setInterval(fetchGeopolitics, 20000);
-        setInterval(fetchRedNews, 60000);
+        setInterval(fetchAnalysis, 4500);          // ຊິ້ງຄ໌ສັນຍານທຸກໆ 4.5 ວິນາທີ
+        setInterval(fetchLiquidityAnalysis, 6000); // ກວດສອບ Liquidity ທຸກໆ 6 ວິນາທີ
+        setInterval(fetchAutoBotDebate, 14000);    // AI Debate ທຸກໆ 14 ວິນາທີ
+        setInterval(fetchGeopolitics, 30000);      // ຂ່າວ Geopolitics ທຸກໆ 30 ວິນາທີ
+        setInterval(fetchRedNews, 90000);          // ຂ່າວແດງ USD ທຸກໆ 1.5 ນາທີ
     </script>
 </body>
 </html>
