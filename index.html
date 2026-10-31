@@ -101,7 +101,7 @@
         <button id="tab-btn-debate" onclick="switchTab('debate')" 
                 class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-gray-800/80 text-cyan-300 hover:text-white hover:bg-cyan-900/50 border border-cyan-500/40">
             <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
-            <i class="fa-solid fa-comments text-cyan-400"></i>
+            <i class="fa-brands fa-twitch text-purple-400 mr-1"></i>
             <span>ຫ້ອງ AI ຖົກຖຽງກັນ (Auto Live Debate)</span>
         </button>
     </nav>
@@ -336,80 +336,98 @@
         </div>
     </section>
 
-    <!-- ==================== VIEW 4: AUTO LIVE DEBATE ==================== -->
-    <section id="view-debate" class="hidden space-y-6">
-        <div class="flex flex-wrap justify-between items-center bg-gray-900/90 border border-cyan-500/40 p-4 md:p-5 rounded-2xl glow-blue">
+    <!-- ==================== VIEW 4: AUTO LIVE DEBATE (TWITCH / IRC STYLE) ==================== -->
+    <section id="view-debate" class="hidden space-y-4">
+        <!-- Twitch Header Bar -->
+        <div class="flex flex-wrap justify-between items-center bg-[#18181b] border border-gray-700/80 px-4 py-3 rounded-xl shadow-md">
             <div class="flex items-center gap-3">
-                <i class="fa-solid fa-users-viewfinder text-cyan-400 text-3xl animate-pulse"></i>
+                <i class="fa-brands fa-twitch text-purple-400 text-2xl animate-pulse"></i>
                 <div>
-                    <h2 class="text-base md:text-lg font-bold text-cyan-400 flex items-center gap-2">
-                        🤖 AI Swarm Live Autonomous Debate Room
+                    <h2 class="text-sm md:text-base font-bold text-white flex items-center gap-2">
+                        #xauusd_ai_swarm_debate <span class="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-wider animate-pulse">LIVE</span>
                     </h2>
-                    <p class="text-xs md:text-sm text-gray-300">3 AI ຜູ້ຊ່ຽວຊານກຳລັງຕິດຕາມແທ່ງທຽນ, Volume ແລະ Indicators ສົດໆຈາກ TradingView OANDA</p>
+                    <p class="text-xs text-gray-400">Stream ການວິເຄາະສົດ Real-Time ໂດຍ 3 AI ຜູ້ຊ່ຽວຊານ (SMC, Orderflow, Consensus)</p>
                 </div>
             </div>
-            <div class="flex items-center gap-3 mt-3 md:mt-0">
-                <span class="text-xs bg-gray-800 text-yellow-300 border border-yellow-500/40 px-3 py-1.5 rounded-xl font-mono" id="debate-chart-status">
+            <div class="flex items-center gap-3 mt-2 sm:mt-0">
+                <span class="text-xs bg-[#0e0e10] border border-gray-700 text-yellow-400 px-3 py-1.5 rounded-lg font-mono" id="debate-chart-status">
                     Tracking OANDA:XAUUSD Live...
                 </span>
-                <span class="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></span>
+                <span class="text-xs text-gray-400 flex items-center gap-1 font-mono">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> 1,000,000 Agents
+                </span>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div class="lg:col-span-8 bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col h-[580px]">
-                <div class="flex justify-between items-center border-b border-gray-800 pb-3 mb-3">
-                    <span class="text-xs font-bold text-gray-300 flex items-center gap-2">
-                        <i class="fa-solid fa-tower-broadcast text-red-500 animate-ping"></i> Live Agents Conversation Stream
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <!-- Twitch Chat Container (ຮູບແບບຮູບທີ 1) -->
+            <div class="lg:col-span-8 bg-[#0e0e10] border border-gray-800 rounded-xl flex flex-col h-[600px] shadow-2xl overflow-hidden">
+                <!-- Chat Window Top Bar -->
+                <div class="bg-[#18181b] border-b border-gray-800 px-4 py-2 flex justify-between items-center text-xs text-gray-400 font-mono">
+                    <span class="flex items-center gap-2 text-gray-300 font-bold">
+                        <i class="fa-solid fa-comments text-purple-400"></i> STREAM CHAT
                     </span>
-                    <span class="text-[11px] text-gray-400 font-mono">Real-time Chart Sync</span>
+                    <span class="text-[11px] text-emerald-400">● Connected to AI Swarm Voice</span>
                 </div>
 
-                <div class="flex-grow overflow-y-auto custom-scroll space-y-3 pr-2 text-xs" id="auto-debate-stream">
-                    <!-- ຂໍ້ຄວາມ Debate ຈະ Render ທີ່ນີ້ -->
+                <!-- Chat Message Stream (ບ່ອນຂໍ້ຄວາມໄຫຼ ຄືຮູບທີ 1) -->
+                <div id="twitch-chat-stream" class="flex-1 overflow-y-auto custom-scroll p-3 space-y-1.5 text-xs font-mono leading-relaxed bg-[#0b0e14]">
+                    <!-- ຂໍ້ຄວາມຕ້ອນຮັບເລີ່ມຕົ້ນ -->
+                    <div class="text-gray-500 text-[11px] py-1 border-b border-gray-800/60 mb-2">
+                        [System]: ຍິນດີຕ້ອນຮັບສູ່ຫ້ອງ AI Live Debate. ລະບົບກຳລັງດຶງແທ່ງທຽນ M15 ຈາກ TradingView OANDA...
+                    </div>
+                </div>
+
+                <!-- Chat Footer Info Bar -->
+                <div class="bg-[#18181b] border-t border-gray-800 p-2.5 flex items-center justify-between text-xs text-gray-400">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                        <span class="text-[11px]">Chat Feed: Real-time Auto Streaming</span>
+                    </div>
+                    <button onclick="clearChatStream()" class="text-[11px] text-gray-400 hover:text-red-400 transition underline">
+                        ລຶບປະຫວັດແຊັດ
+                    </button>
                 </div>
             </div>
 
-            <div class="lg:col-span-4 space-y-4">
-                <div class="bg-gray-900 border border-gray-800 p-4 rounded-2xl space-y-3">
-                    <h3 class="text-xs font-bold text-gray-300 uppercase tracking-wider border-b border-gray-800 pb-2">
-                        👥 AI Agents ທີ່ກຳລັງຖົກຖຽງກັນ:
+            <!-- Agent Roles Side Panel -->
+            <div class="lg:col-span-4 space-y-3">
+                <div class="bg-[#18181b] border border-gray-800 p-4 rounded-xl space-y-3">
+                    <h3 class="text-xs font-bold text-gray-300 uppercase tracking-wider border-b border-gray-700/80 pb-2 flex items-center justify-between">
+                        <span>👥 CHAT PARTICIPANTS (3 AI)</span>
+                        <span class="text-purple-400 text-[11px]">Verified</span>
                     </h3>
 
-                    <div class="p-3 bg-purple-950/30 border border-purple-900/50 rounded-xl flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-purple-900/60 flex items-center justify-center text-purple-400 font-bold">
-                            <i class="fa-solid fa-bolt"></i>
-                        </div>
+                    <div class="p-2.5 bg-gray-900/90 border border-purple-500/30 rounded-lg flex items-center gap-3">
+                        <span class="bg-purple-600 text-white text-[10px] px-2 py-0.5 rounded font-bold font-mono">MOD</span>
                         <div>
-                            <div class="font-bold text-purple-400 text-xs">AI SMC Specialist</div>
-                            <div class="text-[11px] text-gray-400">ວິເຄາະ Rejection Wick, Order Block & BSL/SSL</div>
+                            <div class="font-bold text-purple-400 text-xs">AI_SMC_Specialist</div>
+                            <div class="text-[11px] text-gray-400">ວິເຄາະ Rejection Wick, Order Block, BSL/SSL</div>
                         </div>
                     </div>
 
-                    <div class="p-3 bg-cyan-950/30 border border-cyan-900/50 rounded-xl flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-cyan-900/60 flex items-center justify-center text-cyan-400 font-bold">
-                            <i class="fa-solid fa-radar"></i>
-                        </div>
+                    <div class="p-2.5 bg-gray-900/90 border border-cyan-500/30 rounded-lg flex items-center gap-3">
+                        <span class="bg-cyan-600 text-slate-950 text-[10px] px-2 py-0.5 rounded font-bold font-mono">VIP</span>
                         <div>
-                            <div class="font-bold text-cyan-400 text-xs">MM Orderflow Hunter</div>
+                            <div class="font-bold text-cyan-400 text-xs">MM_Orderflow_Hunter</div>
                             <div class="text-[11px] text-gray-400">ໄລ່ລ່າຮອຍຕີນເຈົ້າຕະຫຼາດ & Volume ກິນ Stop Loss</div>
                         </div>
                     </div>
 
-                    <div class="p-3 bg-yellow-950/30 border border-yellow-900/50 rounded-xl flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-yellow-900/60 flex items-center justify-center text-yellow-400 font-bold">
-                            <i class="fa-solid fa-brain"></i>
-                        </div>
+                    <div class="p-2.5 bg-gray-900/90 border border-amber-500/30 rounded-lg flex items-center gap-3">
+                        <span class="bg-amber-500 text-slate-950 text-[10px] px-2 py-0.5 rounded font-bold font-mono">BOT</span>
                         <div>
-                            <div class="font-bold text-yellow-400 text-xs">AI 1M Swarm Consensus</div>
-                            <div class="text-[11px] text-gray-400">ສັງລວມສຽງໂຫວດ & ສົ່ງຄຳສັ່ງ AUTO BUY/SELL</div>
+                            <div class="font-bold text-amber-400 text-xs">AI_Swarm_Consensus</div>
+                            <div class="text-[11px] text-gray-400">ສັງລວມສຽງໂຫວດ 1M Agents & ສັ່ງ ACTION</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="p-4 bg-gray-900/80 border border-gray-800 rounded-2xl text-xs text-gray-300 leading-relaxed">
-                    <b class="text-cyan-400 block mb-1"><i class="fa-solid fa-circle-info"></i> ການເຮັດວຽກຂອງຫ້ອງນີ້:</b>
-                    AI ທັງ 3 ຕົວຈະວິເຄາະລາຄາຄຳ, RSI, MACD ແລະ ແທ່ງທຽນປັດຈຸບັນແບບ Real-time ເພື່ອລາຍງານວ່າເຈົ້າຕະຫຼາດກຳລັງເຮັດຫຍັງ ແລະ ຄວນເຂົ້າອໍເດີຕອນໃດ.
+                <div class="p-4 bg-[#18181b] border border-gray-800 rounded-xl text-xs text-gray-300 leading-relaxed space-y-2">
+                    <b class="text-yellow-400 block"><i class="fa-solid fa-chart-line"></i> ການວິເຄາະແບບ Live Stream:</b>
+                    <p class="text-[11px] text-gray-400">
+                        ຂໍ້ຄວາມຈະໄຫຼລົງມາເລື້ອຍໆ ຄືກັບແຊັດ Twitch ແທ້. AI ທັງ 3 ຈະຕິດຕາມແທ່ງທຽນ M15 ແລະ ໂຕ້ຕອບກັນທັນທີທີ່ມີການປ່ຽນແປງຂອງລາຄາ ຫຼື ເກີດການ Sweep Liquidity.
+                    </p>
                 </div>
             </div>
         </div>
@@ -429,7 +447,6 @@
         let soundTimeRemaining = 300;
         let lastSweepTriggerId = null;
 
-        // ປົດລັອກສຽງອັດຕະໂນມັດເມື່ອຜູ້ໃຊ້ກົດຄລິກຄັ້ງທຳອິດເທິງໜ້າເວັບ
         document.addEventListener('click', () => {
             const player = document.getElementById('audio-alert-player');
             if (player && player.paused && !isSoundPlaying) {
@@ -540,7 +557,7 @@
                 viewLiq.classList.remove('hidden');
                 fetchLiquidityAnalysis();
             } else if (tab === 'debate') {
-                btnDebate.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-cyan-600 text-white shadow-md glow-blue";
+                btnDebate.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-purple-600 text-white shadow-md glow-purple";
                 viewDebate.classList.remove('hidden');
                 fetchAutoBotDebate();
             }
@@ -691,33 +708,61 @@
         }
 
         // ==========================================
-        // AUTO LIVE DEBATE
+        // AUTO LIVE DEBATE (TWITCH / IRC STREAM ENGINE)
         // ==========================================
         async function fetchAutoBotDebate() {
             try {
                 const res = await fetch(`${API_BASE}/swarm-live-debate`);
                 const data = await res.json();
-                if (data.success && data.messages) {
-                    if (data.marketSnapshot) {
-                        document.getElementById('debate-chart-status').innerText = `XAU: $${data.marketSnapshot.price} | RSI: ${data.marketSnapshot.rsi} | ${data.marketSnapshot.status}`;
-                    }
-                    const debateStream = document.getElementById('auto-debate-stream');
-                    if (debateStream) {
-                        debateStream.innerHTML = data.messages.map(m => `
-                            <div class="bg-gray-800/90 p-3.5 rounded-xl border border-gray-700/80 text-gray-200 shadow-sm transition hover:border-gray-600">
-                                <div class="flex justify-between items-center mb-1.5">
-                                    <span class="font-bold ${m.color} flex items-center gap-1.5 text-xs md:text-sm">
-                                        <i class="${m.icon}"></i> ${m.agentName}
-                                    </span>
-                                    <span class="text-[10px] text-gray-500 font-mono">${m.time}</span>
-                                </div>
-                                <p class="leading-relaxed text-gray-300 text-xs">${m.message}</p>
-                            </div>
-                        `).join('');
-                        debateStream.scrollTop = debateStream.scrollHeight;
-                    }
+                if (!data.success || !data.messages) return;
+
+                if (data.marketSnapshot) {
+                    document.getElementById('debate-chart-status').innerText = 
+                        `XAU: $${data.marketSnapshot.price} | RSI: ${data.marketSnapshot.rsi} | ${data.marketSnapshot.status}`;
                 }
+
+                const chatStream = document.getElementById('twitch-chat-stream');
+                if (!chatStream) return;
+
+                data.messages.forEach((m, idx) => {
+                    setTimeout(() => {
+                        let badgeHtml = "";
+                        if (m.badge === 'mod') {
+                            badgeHtml = `<span class="bg-purple-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold mr-1">MOD</span>`;
+                        } else if (m.badge === 'vip') {
+                            badgeHtml = `<span class="bg-cyan-600 text-slate-950 text-[9px] px-1.5 py-0.5 rounded font-bold mr-1">VIP</span>`;
+                        } else {
+                            badgeHtml = `<span class="bg-amber-500 text-slate-950 text-[9px] px-1.5 py-0.5 rounded font-bold mr-1">BOT</span>`;
+                        }
+
+                        const line = document.createElement('div');
+                        line.className = "py-1 px-1.5 rounded hover:bg-gray-800/40 transition flex items-start gap-1.5";
+                        line.innerHTML = `
+                            <span class="text-gray-500 text-[11px] whitespace-nowrap">[${m.time}]</span>
+                            <div class="leading-relaxed">
+                                ${badgeHtml}
+                                <span class="font-bold ${m.color}">${m.agent}</span><span class="text-gray-400 mr-1">:</span>
+                                <span class="text-gray-200">${m.message}</span>
+                            </div>
+                        `;
+                        chatStream.appendChild(line);
+
+                        if (chatStream.children.length > 60) {
+                            chatStream.removeChild(chatStream.children[1]);
+                        }
+
+                        chatStream.scrollTop = chatStream.scrollHeight;
+                    }, idx * 1800);
+                });
+
             } catch (e) {}
+        }
+
+        function clearChatStream() {
+            const chatStream = document.getElementById('twitch-chat-stream');
+            if (chatStream) {
+                chatStream.innerHTML = `<div class="text-gray-500 text-[11px] py-1 border-b border-gray-800/60 mb-2">[System]: ລຶບປະຫວັດແຊັດຮຽບຮ້ອຍແລ້ວ.</div>`;
+            }
         }
 
         // ==========================================
