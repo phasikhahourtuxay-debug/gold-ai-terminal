@@ -34,7 +34,8 @@ let lastDebateTime = 0;
 function calculateRealIndicators(closes, highs, lows) {
   const len = closes.length;
   if (len < 15) {
-    return { rsi: 50.0, ema10: closes[len - 1], ema20: closes[len - 1], ema50: closes[len - 1], atr: 9.5 };
+    const lastPrice = closes.length ? closes[closes.length - 1] : 2700;
+    return { rsi: 50.0, ema10: lastPrice, ema20: lastPrice, ema50: lastPrice, atr: 9.5 };
   }
 
   // 1. ຄິດໄລ່ EMA
@@ -94,7 +95,7 @@ function calculateRealIndicators(closes, highs, lows) {
 // ============================================================
 async function getAdvancedMarketData() {
   const now = Date.now();
-  if (cachedMarketData && (now - lastMarketFetchTime < 3500)) {
+  if (cachedMarketData && (now - lastMarketFetchTime < 3000)) {
     return cachedMarketData;
   }
 
@@ -102,52 +103,51 @@ async function getAdvancedMarketData() {
   let price = null;
   let changePct = 0;
 
-  // ແຜນທີ 1: ດຶງຜ່ານ Binance PAXGUSDT
+  // ດຶງຜ່ານ Binance PAXG/USDT (ເຊື່ອມຕໍ່ໄວ ແລະ ບໍ່ມີວັນຕິດ Block)
   try {
-    const bRes = await axios.get('https://data-api.binance.vision/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=40', { timeout: 3500 });
-    if (Array.isArray(bRes.data) && bRes.data.length > 0) {
-      const candles = bRes.data;
+    const res = await axios.get('https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=40', {
+      timeout: 4000
+    });
+    if (Array.isArray(res.data) && res.data.length > 0) {
+      const candles = res.data;
       highs = candles.map(c => parseFloat(c[2]));
       lows = candles.map(c => parseFloat(c[3]));
       closes = candles.map(c => parseFloat(c[4]));
       
-      const rawPrice = closes[closes.length - 1];
-      price = parseFloat((rawPrice - 7.55).toFixed(2));
-      const prev = closes[closes.length - 2] - 7.55;
-      changePct = parseFloat((((price - prev) / prev) * 100).toFixed(2));
+      const currentPaxg = closes[closes.length - 1];
+      const prevPaxg = closes[closes.length - 2];
+      
+      price = parseFloat(currentPaxg.toFixed(2));
+      changePct = parseFloat((((currentPaxg - prevPaxg) / prevPaxg) * 100).toFixed(2));
     }
-  } catch (e) {}
+  } catch (err) {
+    console.error("Binance error, switching to fallback:", err.message);
+  }
 
-  // ແຜນສຳຮອງ: Yahoo Finance
+  // ສຳຮອງຜ່ານ Yahoo Finance GC=F (Gold Futures)
   if (!price) {
     try {
-      const yRes = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD=X?interval=15m&range=2d', {
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-        timeout: 3500
+      const yRes = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=15m&range=1d', {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        timeout: 4000
       });
-      const result = yRes.data?.chart?.result?.[0];
-      if (result) {
-        price = parseFloat(result.meta.regularMarketPrice.toFixed(2));
-        const prev = parseFloat(result.meta.previousClose || price);
-        changePct = parseFloat((((price - prev) / prev) * 100).toFixed(2));
-        const quotes = result.indicators?.quote?.[0];
-        if (quotes) {
-          closes = quotes.close.filter(v => v !== null);
-          highs = quotes.high.filter(v => v !== null);
-          lows = quotes.low.filter(v => v !== null);
-        }
+      const meta = yRes.data?.chart?.result?.[0]?.meta;
+      if (meta?.regularMarketPrice) {
+        price = parseFloat(meta.regularMarketPrice.toFixed(2));
+        changePct = parseFloat((((price - meta.previousClose) / meta.previousClose) * 100).toFixed(2));
       }
     } catch (e) {}
   }
 
-  // Fallback ສຸດທ້າຍຖ້າບໍ່ມີເນັດ
+  // ຖ້າດຶງບໍ່ໄດ້ທັງສອງແທ້ໆ ໃຫ້ໃຊ້ລາຄາປະມານການລ່າສຸດ
   if (!price) {
-    price = 2935.50;
-    closes = [price - 4, price - 2, price - 1, price];
-    highs = [price + 3, price + 4];
-    lows = [price - 5, price - 3];
+    price = 2750.00;
+    closes = [price - 3, price - 1, price];
+    highs = [price + 2, price + 3];
+    lows = [price - 4, price - 2];
   }
 
+  // ຄິດໄລ່ Indicators ຈາກແທ່ງທຽນແທ້
   const indicators = calculateRealIndicators(closes, highs, lows);
   const currentHigh = highs.length ? highs[highs.length - 1] : price + 2.5;
   const currentLow = lows.length ? lows[lows.length - 1] : price - 2.5;
@@ -258,7 +258,7 @@ async function getOrGenerateLiveDebate(market, liq) {
   try {
     if (!process.env.GROQ_API_KEY) throw new Error("No Groq API Key");
 
-    const prompt = `ທ່ານຄື 3 AI ຜູ້ຊ່ຽວຊານລະດັບໂລກທີ່ກຳລັງເຝົ້າເບິ່ງກຣາຟທອງຄຳ XAU/USD ສົດໆຈາກ TradingView OANDA:
+    const prompt = `ທ່ານຄື 3 AI ຜູ້ຊ່ຽວຊານລະດັບໂລກທີ່ກຳລັງເຝົ້າເບິ່ງກຣາຟທອງຄຳ XAU/USD ສົດໆ:
 ຂໍ້ມູນກຣາຟ Real-time:
 - ລາຄາຄຳ Spot: $${p}
 - RSI (14): ${market.rsi.toFixed(1)}
