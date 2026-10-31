@@ -23,6 +23,7 @@
         .glow-red { box-shadow: 0 0 20px rgba(239, 68, 68, 0.25); }
         .glow-purple { box-shadow: 0 0 25px rgba(168, 85, 247, 0.35); }
         .glow-blue { box-shadow: 0 0 25px rgba(6, 182, 212, 0.35); }
+        .glow-amber { box-shadow: 0 0 25px rgba(245, 158, 11, 0.3); }
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: #111827; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
@@ -35,7 +36,7 @@
 </head>
 <body class="p-3 md:p-6">
 
-    <!-- Audio Element ສຳລັບຫຼິ້ນສຽງແຈ້ງເຕືອນ -->
+    <!-- Audio Element -->
     <audio id="audio-alert-player" src="/alert.mp3" loop preload="auto"></audio>
 
     <!-- Header & AI Swarm Status -->
@@ -48,7 +49,6 @@
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-3 mt-3 md:mt-0 text-xs md:text-sm">
-            <!-- ປຸ່ມເລືອກເພງ ແລະ ສະແດງສະຖານະ -->
             <div class="bg-gray-800 px-3 py-1.5 rounded-xl border border-gray-700 flex items-center gap-2">
                 <i class="fa-solid fa-music text-purple-400"></i>
                 <label for="custom-audio-file" class="cursor-pointer text-xs text-yellow-300 hover:text-white underline">
@@ -58,7 +58,6 @@
                 <span id="audio-name-badge" class="text-[11px] text-emerald-400 font-bold max-w-[120px] truncate">(alert.mp3)</span>
             </div>
 
-            <!-- ກ່ອງນັບຖອຍຫຼັງສຽງເຕືອນ 5 ນາທີ -->
             <div id="sound-timer-badge" class="hidden bg-red-950/80 border border-red-500/60 px-3 py-1.5 rounded-xl flex items-center gap-2">
                 <i class="fa-solid fa-volume-high text-red-400 animate-bounce"></i>
                 <span class="text-xs text-red-300 font-mono">ສຽງເຕືອນ: <b id="sound-timer-countdown">05:00</b></span>
@@ -78,7 +77,7 @@
         </div>
     </header>
 
-    <!-- Navigation Tabs -->
+    <!-- Navigation Tabs (ເພີ່ມປຸ່ມແທັບຂ່າວໃໝ່) -->
     <nav class="flex flex-wrap items-center gap-2.5 bg-gray-900/90 border border-gray-800 p-2 rounded-2xl mb-6 backdrop-blur">
         <button id="tab-btn-main" onclick="switchTab('main')" 
                 class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-amber-500 text-slate-950 shadow-md">
@@ -104,9 +103,16 @@
             <i class="fa-brands fa-twitch text-purple-400 mr-1"></i>
             <span>ຫ້ອງ AI ຖົກຖຽງກັນ (Auto Live Debate)</span>
         </button>
+
+        <!-- ປຸ່ມແທັບໃໝ່: ຂ່າວໂລກ & ພູມິລັດຖະສາດ -->
+        <button id="tab-btn-geo" onclick="switchTab('geo')" 
+                class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-gray-800/80 text-amber-300 hover:text-white hover:bg-amber-900/50 border border-amber-500/40">
+            <i class="fa-solid fa-earth-americas text-amber-400 animate-pulse"></i>
+            <span>🌐 ຂ່າວໂລກ & ພູມິລັດຖະສາດ (Macro Sentinel)</span>
+        </button>
     </nav>
 
-    <!-- ==================== VIEW 1: ໜ້າຫຼັກ ==================== -->
+    <!-- ==================== VIEW 1: ໜ້າຫຼັກ (ລຶບກ່ອງຂ່າວເກົ່າອອກແລ້ວ) ==================== -->
     <main id="view-main" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div class="lg:col-span-8 space-y-6">
             <!-- Real-time Chart -->
@@ -197,53 +203,26 @@
             </div>
         </div>
 
-        <!-- Right Column -->
-        <div class="lg:col-span-4 space-y-6">
-            <!-- Geopolitics Widget -->
-            <div class="bg-gray-900 border border-gray-800 p-4 md:p-5 rounded-2xl space-y-4">
-                <div class="flex justify-between items-center border-b border-gray-800 pb-3">
-                    <h3 class="text-sm md:text-base font-bold text-gray-200 flex items-center gap-2">
-                        <i class="fa-solid fa-shield-halved text-yellow-500"></i> AI Geopolitical & Macro Sentinel
-                    </h3>
-                    <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-                </div>
-                <div class="bg-gray-800/70 p-3.5 rounded-xl border-l-4 border-amber-500">
-                    <div class="flex justify-between items-center mb-1">
-                        <span class="font-bold text-amber-400 text-xs md:text-sm"><i class="fa-brands fa-x-twitter"></i> ໂພສ/ຂ່າວ Trump</span>
-                        <span id="trump-impact" class="bg-red-500/20 text-red-400 font-bold px-2 py-0.5 rounded text-[11px]">ຮ້າຍແຮງ</span>
-                    </div>
-                    <p id="trump-post" class="text-gray-200 text-xs font-semibold">ກຳລັງດຶງໂພສ Trump ລ່າສຸດ...</p>
-                    <span id="trump-analysis" class="text-amber-200/80 block mt-2 text-[11px] leading-relaxed">...</span>
-                </div>
-                <div class="bg-gray-800/70 p-3.5 rounded-xl border-l-4 border-red-500">
-                    <div class="flex justify-between items-center mb-1">
-                        <span class="font-bold text-red-400 text-xs md:text-sm"><i class="fa-solid fa-person-rifle"></i> ສົງຄາມ & ນ້ຳມັນ</span>
-                        <span id="war-impact" class="bg-red-500/20 text-red-400 font-bold px-2 py-0.5 rounded text-[11px]">ຮ້າຍແຮງ</span>
-                    </div>
-                    <p id="war-headline" class="text-gray-200 text-xs font-semibold">ກຳລັງດຶງຂ່າວດ່ວນສົງຄາມ & ນ້ຳມັນ...</p>
-                    <span id="war-analysis" class="text-red-200/80 block mt-2 text-[11px] leading-relaxed">...</span>
-                </div>
-            </div>
-
-            <!-- AI Chat Assistant -->
-            <div class="bg-gray-900 border-2 border-amber-500/40 p-4 rounded-2xl flex flex-col h-[460px] glow-gold">
-                <div class="flex items-center justify-between border-b border-gray-800 pb-2.5 mb-2.5">
+        <!-- Right Column: ຂະຫຍາຍ AI Chat Assistant ໃຫ້ເຕັມໜ້າຈໍດ້ານຂວາ (ສວຍງາມ ແລະ ສົມດຸນ) -->
+        <div class="lg:col-span-4">
+            <div class="bg-gray-900 border-2 border-amber-500/40 p-5 rounded-2xl flex flex-col h-[570px] glow-gold">
+                <div class="flex items-center justify-between border-b border-gray-800 pb-3 mb-3">
                     <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-robot text-amber-400 text-lg"></i>
-                        <span class="text-xs md:text-sm font-bold text-amber-400">AI Gold Assistant (Real-time Q&A)</span>
+                        <i class="fa-solid fa-robot text-amber-400 text-xl"></i>
+                        <span class="text-sm font-bold text-amber-400">AI Gold Assistant (Real-time Q&A)</span>
                     </div>
                     <span class="text-[10px] bg-emerald-950 border border-emerald-500/40 text-emerald-300 px-2 py-0.5 rounded-full font-mono">Online</span>
                 </div>
                 <div class="flex-grow overflow-y-auto custom-scroll space-y-3 pr-1 text-xs" id="user-qa-box">
-                    <div class="bg-gray-800/80 p-3 rounded-xl border border-gray-700 text-gray-200">
+                    <div class="bg-gray-800/80 p-3.5 rounded-xl border border-gray-700 text-gray-200">
                         <b class="text-yellow-400 block mb-1"><i class="fa-solid fa-brain"></i> AI Assistant:</b>
                         ສະບາຍດີ! ລະບົບສັນຍານໜ້າຫຼັກໄດ້ຖືກຊິ້ງຄ໌ກັບ <b>Clear Liquidity 1M Hunter</b> ແບບ Real-time ແລ້ວ. ສາມາດພິມຖາມລາຄາ ແລະ ທິດທາງກຣາຟໄດ້ເລີຍ!
                     </div>
                 </div>
-                <form id="chat-form" class="mt-2.5 flex gap-2" onsubmit="handleUserChatSubmit(event)">
+                <form id="chat-form" class="mt-3 flex gap-2" onsubmit="handleUserChatSubmit(event)">
                     <input type="text" id="chat-input" placeholder="ພິມຖາມ AI (ຕົວຢ່າງ: ຕອນນີ້ຄວນ Buy ຫຼື Sell ຕາມເຈົ້າຕະຫຼາດ?)..." 
-                           class="flex-grow bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-yellow-500" required>
-                    <button type="submit" id="chat-submit-btn" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-4 py-2.5 rounded-xl text-xs transition">
+                           class="flex-grow bg-gray-800 border border-gray-700 rounded-xl px-3.5 py-3 text-xs text-white focus:outline-none focus:border-yellow-500" required>
+                    <button type="submit" id="chat-submit-btn" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-4 py-3 rounded-xl text-xs transition">
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
                 </form>
@@ -338,7 +317,6 @@
 
     <!-- ==================== VIEW 4: AUTO LIVE DEBATE (TWITCH / IRC STYLE) ==================== -->
     <section id="view-debate" class="hidden space-y-4">
-        <!-- Twitch Header Bar -->
         <div class="flex flex-wrap justify-between items-center bg-[#18181b] border border-gray-700/80 px-4 py-3 rounded-xl shadow-md">
             <div class="flex items-center gap-3">
                 <i class="fa-brands fa-twitch text-purple-400 text-2xl animate-pulse"></i>
@@ -360,9 +338,7 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <!-- Twitch Chat Container (ຮູບແບບຮູບທີ 1) -->
             <div class="lg:col-span-8 bg-[#0e0e10] border border-gray-800 rounded-xl flex flex-col h-[600px] shadow-2xl overflow-hidden">
-                <!-- Chat Window Top Bar -->
                 <div class="bg-[#18181b] border-b border-gray-800 px-4 py-2 flex justify-between items-center text-xs text-gray-400 font-mono">
                     <span class="flex items-center gap-2 text-gray-300 font-bold">
                         <i class="fa-solid fa-comments text-purple-400"></i> STREAM CHAT
@@ -370,15 +346,12 @@
                     <span class="text-[11px] text-emerald-400">● Connected to AI Swarm Voice</span>
                 </div>
 
-                <!-- Chat Message Stream (ບ່ອນຂໍ້ຄວາມໄຫຼ ຄືຮູບທີ 1) -->
                 <div id="twitch-chat-stream" class="flex-1 overflow-y-auto custom-scroll p-3 space-y-1.5 text-xs font-mono leading-relaxed bg-[#0b0e14]">
-                    <!-- ຂໍ້ຄວາມຕ້ອນຮັບເລີ່ມຕົ້ນ -->
                     <div class="text-gray-500 text-[11px] py-1 border-b border-gray-800/60 mb-2">
                         [System]: ຍິນດີຕ້ອນຮັບສູ່ຫ້ອງ AI Live Debate. ລະບົບກຳລັງດຶງແທ່ງທຽນ M15 ຈາກ TradingView OANDA...
                     </div>
                 </div>
 
-                <!-- Chat Footer Info Bar -->
                 <div class="bg-[#18181b] border-t border-gray-800 p-2.5 flex items-center justify-between text-xs text-gray-400">
                     <div class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-green-500"></span>
@@ -390,7 +363,6 @@
                 </div>
             </div>
 
-            <!-- Agent Roles Side Panel -->
             <div class="lg:col-span-4 space-y-3">
                 <div class="bg-[#18181b] border border-gray-800 p-4 rounded-xl space-y-3">
                     <h3 class="text-xs font-bold text-gray-300 uppercase tracking-wider border-b border-gray-700/80 pb-2 flex items-center justify-between">
@@ -433,14 +405,75 @@
         </div>
     </section>
 
+    <!-- ==================== VIEW 5: ຂ່າວໂລກ & ພູມິລັດຖະສາດ (MACRO SENTINEL ໃໝ່ລ່າສຸດ) ==================== -->
+    <section id="view-geo" class="hidden space-y-6">
+        <!-- Header Banner -->
+        <div class="flex flex-wrap justify-between items-center bg-gray-900/90 border-2 border-amber-500/40 p-4 md:p-5 rounded-2xl glow-amber">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-earth-americas text-amber-400 text-3xl animate-pulse"></i>
+                <div>
+                    <h2 class="text-base md:text-lg font-bold text-amber-400 flex items-center gap-2">
+                        AI Geopolitical & Macro Sentinel (1,000,000 Agents Feed)
+                    </h2>
+                    <p class="text-xs md:text-sm text-gray-300">
+                        AI ດຶງຂ່າວໃຫຍ່ຈາກສື່ສະຫະລັດ (Reuters, Bloomberg, Fed, War, Oil, Hack) ມາສະຫຼຸບ ແລະ ວິເຄາະຜົນກະທົບຕໍ່ທອງຄຳ
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 mt-3 md:mt-0">
+                <button onclick="fetchGeopolitics()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs md:text-sm transition flex items-center gap-1.5 shadow-md">
+                    <i class="fa-solid fa-arrows-rotate"></i> ອັບເດດຂ່າວໃໝ່
+                </button>
+            </div>
+        </div>
+
+        <!-- 3. ກ່ອງໂພສ/ຂ່າວ Trump ແບບພິເສດ (Pinned VIP Card ຄືເກົ່າ) -->
+        <div class="bg-gradient-to-r from-gray-900 via-gray-900 to-amber-950/40 border-2 border-amber-500/70 p-5 rounded-2xl glow-gold space-y-3">
+            <div class="flex flex-wrap justify-between items-center border-b border-gray-800 pb-2.5">
+                <div class="flex items-center gap-2">
+                    <i class="fa-brands fa-x-twitter text-amber-400 text-xl"></i>
+                    <span class="font-bold text-amber-400 text-sm md:text-base">ໂພສ/ຂ່າວ Trump & ນະໂຍບາຍການຄ້າສະຫະລັດ</span>
+                    <span class="bg-red-500/20 text-red-400 border border-red-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono uppercase">PINNED TRUMP FEED</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs font-mono">
+                    <span id="trump-time" class="text-gray-400">...</span>
+                    <span id="trump-impact" class="bg-red-500/20 text-red-400 font-bold px-2.5 py-0.5 rounded">ຮ້າຍແຮງ</span>
+                </div>
+            </div>
+            <p id="trump-post" class="text-white text-sm md:text-base font-semibold leading-relaxed italic">
+                ກຳລັງດຶງໂພສ ແລະ ນະໂຍບາຍ Trump ລ່າສຸດ...
+            </p>
+            <div class="bg-gray-800/80 p-3 rounded-xl border border-gray-700/80 flex flex-wrap justify-between items-center text-xs">
+                <span id="trump-analysis" class="text-amber-200/90 leading-relaxed max-w-3xl">...</span>
+                <span id="trump-gold-effect" class="font-bold font-mono text-emerald-400 mt-2 sm:mt-0">Gold Bullish 🚀</span>
+            </div>
+        </div>
+
+        <!-- Feed ຂ່າວໃຫຍ່ (Newest First + Auto-delete > 7 ມື້) -->
+        <div>
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-sm font-bold text-gray-300 flex items-center gap-2">
+                    <i class="fa-solid fa-newspaper text-yellow-400"></i>
+                    ຂ່າວດ່ວນລະດັບໂລກທີ່ມີຜົນຕໍ່ທອງຄຳ (<span id="macro-news-count">0</span> ຂ່າວລ່າສຸດ)
+                </h3>
+                <span class="text-xs text-gray-400 font-mono">* ລະບົບຄັດລົບຂ່າວທີ່ເກີນ 7 ມື້ຖິ້ມອັດຕະໂນມັດ</span>
+            </div>
+
+            <!-- Grid ຂ່າວ -->
+            <div id="macro-news-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="text-gray-400 text-sm p-8 col-span-full text-center bg-gray-900/60 rounded-2xl">
+                    <i class="fa-solid fa-spinner fa-spin text-amber-400 text-2xl mb-2"></i>
+                    <p>AI 1,000,000 Agents ກຳລັງສະແກນຂ່າວສານໃຫຍ່ຈາກສະຫະລັດອາເມລິກາ...</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- ==================== JAVASCRIPT ==================== -->
     <script>
         const API_BASE = "/api";
         let activeTab = 'main';
 
-        // ==========================================
-        // ລະບົບສຽງແຈ້ງເຕືອນ & Unlock Autoplay
-        // ==========================================
         let customAudioUrl = "/alert.mp3";
         let isSoundPlaying = false;
         let soundTimerInterval = null;
@@ -494,7 +527,6 @@
             const player = document.getElementById('audio-alert-player');
             player.currentTime = 0;
             player.play().catch(e => {
-                console.log("Audio autoplay prevented, using fallback synth:", e);
                 playFallbackSynthSiren();
             });
 
@@ -531,19 +563,22 @@
             const btnNews = document.getElementById('tab-btn-news');
             const btnLiq = document.getElementById('tab-btn-liq');
             const btnDebate = document.getElementById('tab-btn-debate');
+            const btnGeo = document.getElementById('tab-btn-geo');
 
             const viewMain = document.getElementById('view-main');
             const viewNews = document.getElementById('view-news');
             const viewLiq = document.getElementById('view-liq');
             const viewDebate = document.getElementById('view-debate');
+            const viewGeo = document.getElementById('view-geo');
 
-            [btnMain, btnNews, btnLiq, btnDebate].forEach(b => {
+            [btnMain, btnNews, btnLiq, btnDebate, btnGeo].forEach(b => {
                 b.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-gray-800/80 text-gray-300 hover:text-white hover:bg-gray-800 border border-transparent";
             });
             viewMain.classList.add('hidden');
             viewNews.classList.add('hidden');
             viewLiq.classList.add('hidden');
             viewDebate.classList.add('hidden');
+            viewGeo.classList.add('hidden');
 
             if (tab === 'main') {
                 btnMain.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-amber-500 text-slate-950 shadow-md";
@@ -557,9 +592,13 @@
                 viewLiq.classList.remove('hidden');
                 fetchLiquidityAnalysis();
             } else if (tab === 'debate') {
-                btnDebate.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-purple-600 text-white shadow-md glow-purple";
+                btnDebate.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-cyan-600 text-white shadow-md glow-blue";
                 viewDebate.classList.remove('hidden');
                 fetchAutoBotDebate();
+            } else if (tab === 'geo') {
+                btnGeo.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-amber-600 text-white shadow-md glow-amber";
+                viewGeo.classList.remove('hidden');
+                fetchGeopolitics();
             }
         }
 
@@ -580,9 +619,6 @@
         setInterval(updateAsiaClock, 1000);
         updateAsiaClock();
 
-        // ==========================================
-        // ດຶງຂໍ້ມູນການວິເຄາະ & Key Levels
-        // ==========================================
         async function fetchAnalysis() {
             try {
                 const res = await fetch(`${API_BASE}/analysis`);
@@ -625,9 +661,6 @@
             } catch (err) {}
         }
 
-        // ==========================================
-        // LIQUIDITY HUNTER & Canvas
-        // ==========================================
         async function fetchLiquidityAnalysis() {
             try {
                 const res = await fetch(`${API_BASE}/liquidity-hunt`);
@@ -707,9 +740,6 @@
             } catch (err) {}
         }
 
-        // ==========================================
-        // AUTO LIVE DEBATE (TWITCH / IRC STREAM ENGINE)
-        // ==========================================
         async function fetchAutoBotDebate() {
             try {
                 const res = await fetch(`${API_BASE}/swarm-live-debate`);
@@ -750,7 +780,6 @@
                         if (chatStream.children.length > 60) {
                             chatStream.removeChild(chatStream.children[1]);
                         }
-
                         chatStream.scrollTop = chatStream.scrollHeight;
                     }, idx * 1800);
                 });
@@ -766,8 +795,87 @@
         }
 
         // ==========================================
-        // Q&A Chatbot, Geopolitics & News
+        // FETCH GEOPOLITICS & MACRO SENTINEL (VIEW 5)
         // ==========================================
+        async function fetchGeopolitics() {
+            try {
+                const res = await fetch(`${API_BASE}/geopolitics`);
+                const data = await res.json();
+                if (!data.success) return;
+
+                // ອັບເດດກ່ອງ Trump
+                if (data.trump) {
+                    document.getElementById('trump-post').innerText = `"${data.trump.post}"`;
+                    document.getElementById('trump-time').innerText = data.trump.time;
+                    document.getElementById('trump-impact').innerText = data.trump.impactLevel;
+                    document.getElementById('trump-analysis').innerText = `→ AI ວິເຄາະ: ${data.trump.aiAnalysis}`;
+                    document.getElementById('trump-gold-effect').innerText = data.trump.goldEffect;
+                }
+
+                // ອັບເດດ Feed ຂ່າວໃຫຍ່ (Newest First)
+                if (data.news && Array.isArray(data.news)) {
+                    document.getElementById('macro-news-count').innerText = data.count || data.news.length;
+                    const container = document.getElementById('macro-news-grid');
+
+                    if (data.news.length === 0) {
+                        container.innerHTML = `<div class="col-span-full p-8 text-center text-gray-400 bg-gray-900 rounded-2xl">ບໍ່ພົບຂ່າວໃຫຍ່ພາຍໃນ 7 ມື້ຫຼ້າສຸດ.</div>`;
+                        return;
+                    }
+
+                    container.innerHTML = data.news.map(item => `
+                        <div class="bg-gray-900 border border-gray-800 hover:border-gray-700 p-4 rounded-2xl space-y-3 transition shadow-md">
+                            <div class="flex flex-wrap justify-between items-center gap-2">
+                                <span class="bg-amber-500/20 text-amber-400 text-xs px-2.5 py-0.5 rounded-full font-bold">
+                                    <i class="fa-solid fa-tag mr-1"></i> ${item.category}
+                                </span>
+                                <div class="flex items-center gap-2 text-xs font-mono">
+                                    <span class="text-gray-400"><i class="fa-regular fa-clock mr-1"></i> ${item.time}</span>
+                                    <span class="bg-gray-800 text-gray-300 border border-gray-700 px-2 py-0.5 rounded">${item.source}</span>
+                                </div>
+                            </div>
+
+                            <h4 class="text-sm md:text-base font-bold text-white leading-snug">${item.title}</h4>
+                            <p class="text-xs text-gray-300 leading-relaxed bg-gray-800/60 p-2.5 rounded-xl border border-gray-700/60">${item.summary}</p>
+
+                            <div class="bg-gray-800/90 p-3 rounded-xl border-l-4 border-amber-500 text-xs space-y-1">
+                                <div class="flex justify-between items-center mb-1">
+                                    <b class="text-amber-400"><i class="fa-solid fa-brain mr-1"></i> AI 1M Swarm ວິເຄາະຜົນກະທົບ:</b>
+                                    <span class="font-bold font-mono ${item.goldEffect.includes('Bullish') ? 'text-emerald-400' : 'text-red-400'}">${item.goldEffect}</span>
+                                </div>
+                                <p class="text-gray-300 text-[11px] leading-relaxed">${item.aiGoldAnalysis}</p>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+            } catch (err) {}
+        }
+
+        async function fetchRedNews() {
+            try {
+                const res = await fetch(`${API_BASE}/red-news`);
+                const result = await res.json();
+                if (result.success) {
+                    document.getElementById('red-news-badge').innerText = result.count;
+                    const container = document.getElementById('red-news-grid');
+                    if (result.count === 0) {
+                        container.innerHTML = `<div class="col-span-full bg-gray-900/60 p-8 rounded-2xl text-center text-gray-400">ບໍ່ມີຂ່າວສີແດງ USD ໃນອາທິດນີ້.</div>`;
+                        return;
+                    }
+                    container.innerHTML = result.data.map(item => `
+                        <div class="bg-gray-900/95 border border-gray-800 p-4 rounded-2xl space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="bg-blue-600/20 text-blue-400 font-bold text-xs px-2 py-0.5 rounded">USD</span>
+                                <span class="text-xs text-amber-400 font-mono">${item.time}</span>
+                            </div>
+                            <h3 class="text-sm font-bold text-gray-100">${item.title}</h3>
+                            <div class="text-xs text-gray-300 bg-gray-800/80 p-2.5 rounded-xl">${item.analysis}</div>
+                        </div>
+                    `).join('');
+                }
+            } catch (err) {}
+        }
+
         async function handleUserChatSubmit(e) {
             e.preventDefault();
             const input = document.getElementById('chat-input');
@@ -816,46 +924,6 @@
             } finally {
                 submitBtn.disabled = false;
             }
-        }
-
-        async function fetchGeopolitics() {
-            try {
-                const res = await fetch(`${API_BASE}/geopolitics`);
-                const data = await res.json();
-                if (data.success) {
-                    document.getElementById('trump-post').innerText = `"${data.trump.post}"`;
-                    document.getElementById('trump-impact').innerText = data.trump.impactLevel;
-                    document.getElementById('trump-analysis').innerText = `→ ${data.trump.aiAnalysis}`;
-                    document.getElementById('war-headline').innerText = data.warAndOil.headline;
-                    document.getElementById('war-impact').innerText = data.warAndOil.impactLevel;
-                    document.getElementById('war-analysis').innerText = `→ ${data.warAndOil.aiAnalysis}`;
-                }
-            } catch (err) {}
-        }
-
-        async function fetchRedNews() {
-            try {
-                const res = await fetch(`${API_BASE}/red-news`);
-                const result = await res.json();
-                if (result.success) {
-                    document.getElementById('red-news-badge').innerText = result.count;
-                    const container = document.getElementById('red-news-grid');
-                    if (result.count === 0) {
-                        container.innerHTML = `<div class="col-span-full bg-gray-900/60 p-8 rounded-2xl text-center text-gray-400">ບໍ່ມີຂ່າວສີແດງ USD ໃນອາທິດນີ້.</div>`;
-                        return;
-                    }
-                    container.innerHTML = result.data.map(item => `
-                        <div class="bg-gray-900/95 border border-gray-800 p-4 rounded-2xl space-y-3">
-                            <div class="flex justify-between items-center">
-                                <span class="bg-blue-600/20 text-blue-400 font-bold text-xs px-2 py-0.5 rounded">USD</span>
-                                <span class="text-xs text-amber-400 font-mono">${item.time}</span>
-                            </div>
-                            <h3 class="text-sm font-bold text-gray-100">${item.title}</h3>
-                            <div class="text-xs text-gray-300 bg-gray-800/80 p-2.5 rounded-xl">${item.analysis}</div>
-                        </div>
-                    `).join('');
-                }
-            } catch (err) {}
         }
 
         function drawLiquidityVisual(data) {
@@ -940,7 +1008,7 @@
         }
 
         // ==========================================
-        // ເລີ່ມຕົ້ນລະບົບ & Real-time Loops
+        // ເລີ່ມຕົ້ນລະບົບ
         // ==========================================
         fetchAnalysis();
         fetchGeopolitics();
@@ -948,11 +1016,11 @@
         fetchLiquidityAnalysis();
         fetchAutoBotDebate();
 
-        setInterval(fetchAnalysis, 4500);          // ຊິ້ງຄ໌ສັນຍານທຸກໆ 4.5 ວິນາທີ
-        setInterval(fetchLiquidityAnalysis, 6000); // ກວດສອບ Liquidity ທຸກໆ 6 ວິນາທີ
-        setInterval(fetchAutoBotDebate, 14000);    // AI Debate ທຸກໆ 14 ວິນາທີ
-        setInterval(fetchGeopolitics, 30000);      // ຂ່າວ Geopolitics ທຸກໆ 30 ວິນາທີ
-        setInterval(fetchRedNews, 90000);          // ຂ່າວແດງ USD ທຸກໆ 1.5 ນາທີ
+        setInterval(fetchAnalysis, 4500);
+        setInterval(fetchLiquidityAnalysis, 6000);
+        setInterval(fetchAutoBotDebate, 14000);
+        setInterval(fetchGeopolitics, 60000); // ກວດສອບຂ່າວໂລກທຸກໆ 1 ນາທີ
+        setInterval(fetchRedNews, 90000);
     </script>
 </body>
 </html>
