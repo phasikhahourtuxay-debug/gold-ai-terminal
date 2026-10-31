@@ -10,7 +10,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ໃຫ້ Express ສາມາດເປີດໄຟລ໌ index.html ແລະ ໄຟລ໌ສຽງ alert.mp3 ໄດ້
+// ໃຫ້ Express ສາມາດເປີດໄຟລ໌ static (index.html, alert.mp3) ໄດ້
 app.use(express.static(path.join(__dirname)));
 
 // ເຊື່ອມຕໍ່ Groq Cloud AI ດ້ວຍ Model ທີ່ທົດສອບຜ່ານ 100%
@@ -25,8 +25,6 @@ let cachedMarketData = null;
 let lastMarketFetchTime = 0;
 let cachedForexNews = null;
 let lastNewsFetchTime = 0;
-let cachedDebateMessages = [];
-let lastDebateTime = 0;
 
 // ============================================================
 // 1. ຟັງຊັນຄິດໄລ່ INDICATORS ທາງການເງິນແທ້ໆ ຈາກແທ່ງທຽນ (Real Math)
@@ -34,7 +32,7 @@ let lastDebateTime = 0;
 function calculateRealIndicators(closes, highs, lows) {
   const len = closes.length;
   if (len < 15) {
-    const lastPrice = closes.length ? closes[closes.length - 1] : 2700;
+    const lastPrice = closes.length ? closes[closes.length - 1] : 2750;
     return { rsi: 50.0, ema10: lastPrice, ema20: lastPrice, ema50: lastPrice, atr: 9.5 };
   }
 
@@ -103,7 +101,7 @@ async function getAdvancedMarketData() {
   let price = null;
   let changePct = 0;
 
-  // ດຶງຜ່ານ Binance PAXG/USDT (ເຊື່ອມຕໍ່ໄວ ແລະ ບໍ່ມີວັນຕິດ Block)
+  // ດຶງຜ່ານ Binance PAXG/USDT (ເຊື່ອມຕໍ່ໄວ ແລະ ບໍ່ຕິດ Block)
   try {
     const res = await axios.get('https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=40', {
       timeout: 4000
@@ -113,10 +111,10 @@ async function getAdvancedMarketData() {
       highs = candles.map(c => parseFloat(c[2]));
       lows = candles.map(c => parseFloat(c[3]));
       closes = candles.map(c => parseFloat(c[4]));
-      
+
       const currentPaxg = closes[closes.length - 1];
       const prevPaxg = closes[closes.length - 2];
-      
+
       price = parseFloat(currentPaxg.toFixed(2));
       changePct = parseFloat((((currentPaxg - prevPaxg) / prevPaxg) * 100).toFixed(2));
     }
@@ -124,11 +122,11 @@ async function getAdvancedMarketData() {
     console.error("Binance error, switching to fallback:", err.message);
   }
 
-  // ສຳຮອງຜ່ານ Yahoo Finance GC=F (Gold Futures)
+  // ສຳຮອງຜ່ານ Yahoo Finance GC=F
   if (!price) {
     try {
       const yRes = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=15m&range=1d', {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        headers: { 'User-Agent': 'Mozilla/5.0' },
         timeout: 4000
       });
       const meta = yRes.data?.chart?.result?.[0]?.meta;
@@ -139,7 +137,6 @@ async function getAdvancedMarketData() {
     } catch (e) {}
   }
 
-  // ຖ້າດຶງບໍ່ໄດ້ທັງສອງແທ້ໆ ໃຫ້ໃຊ້ລາຄາປະມານການລ່າສຸດ
   if (!price) {
     price = 2750.00;
     closes = [price - 3, price - 1, price];
@@ -147,7 +144,6 @@ async function getAdvancedMarketData() {
     lows = [price - 4, price - 2];
   }
 
-  // ຄິດໄລ່ Indicators ຈາກແທ່ງທຽນແທ້
   const indicators = calculateRealIndicators(closes, highs, lows);
   const currentHigh = highs.length ? highs[highs.length - 1] : price + 2.5;
   const currentLow = lows.length ? lows[lows.length - 1] : price - 2.5;
@@ -244,81 +240,83 @@ function analyze1MLiquiditySweep(market) {
 }
 
 // ============================================================
-// 4. AI SWARM LIVE REAL-TIME DEBATE
+// 4. AI SWARM LIVE REAL-TIME DEBATE (TWITCH / IRC STREAM ENGINE)
 // ============================================================
 async function getOrGenerateLiveDebate(market, liq) {
-  const now = Date.now();
-  if (cachedDebateMessages.length > 0 && (now - lastDebateTime < 15000)) {
-    return cachedDebateMessages;
-  }
-
   const p = market.price.toFixed(2);
-  const timeStr = new Date().toLocaleTimeString('lo-LA', { timeZone: 'Asia/Vientiane', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const timeStr = new Date().toLocaleTimeString('lo-LA', { 
+    timeZone: 'Asia/Vientiane', 
+    hour12: false,
+    hour: '2-digit', 
+    minute: '2-digit', 
+    second: '2-digit' 
+  });
 
   try {
     if (!process.env.GROQ_API_KEY) throw new Error("No Groq API Key");
 
-    const prompt = `ທ່ານຄື 3 AI ຜູ້ຊ່ຽວຊານລະດັບໂລກທີ່ກຳລັງເຝົ້າເບິ່ງກຣາຟທອງຄຳ XAU/USD ສົດໆ:
-ຂໍ້ມູນກຣາຟ Real-time:
-- ລາຄາຄຳ Spot: $${p}
+    const prompt = `ທ່ານຄື 3 AI ຜູ້ຊ່ຽວຊານລະດັບໂລກທີ່ກຳລັງນັ່ງເຝົ້າກຣາຟທອງຄຳ XAU/USD M15 ສົດໆຈາກ TradingView OANDA:
+[ສະຖານະກຣາຟ Real-time]:
+- ລາຄາຄຳປັດຈຸບັນ: $${p}
+- ການປ່ຽນແປງ: ${market.changePct > 0 ? '+' : ''}${market.changePct}%
 - RSI (14): ${market.rsi.toFixed(1)}
-- MACD: ${market.macd.toFixed(2)}
-- EMA10: ${market.ema10.toFixed(2)} | EMA20: ${market.ema20.toFixed(2)} | EMA50: ${market.ema50.toFixed(2)}
-- ສະຖານະ Liquidity Sweep: ${liq.isCleared ? `Clear ${liq.liquidityType} ທີ່ $${liq.clearedPrice}` : 'ຍັງບໍ່ມີ Sweep (ສະສົມແຮງ)'}
-- ສັນຍານຕະຫຼາດ: ${liq.signalAction}
+- EMA10: $${market.ema10.toFixed(2)} | EMA20: $${market.ema20.toFixed(2)} | EMA50: $${market.ema50.toFixed(2)}
+- ATR ຄວາມຜັນຜວນ: $${market.atr}
+- ສະຖານະ Liquidity Sweep: ${liq.isCleared ? `ເກີດ Sweep ${liq.liquidityType} ທີ່ $${liq.clearedPrice}` : 'SideWay ສະສົມ Liquidity (ກອບ $' + liq.minorSupport + ' - $' + liq.minorResistance + ')'}
+- ສັນຍານ: ${liq.signalAction}
 
-ຈົ່ງສ້າງບົດສົນທະນາຖົກຖຽງກັນ 3 ຂໍ້ຄວາມ ເປັນພາສາລາວ (1 ຂໍ້ຄວາມຕໍ່ 1 AI):
-1. "AI SMC Specialist" (ວິເຄາະ Rejection Wick, Order Block, Liquidity Sweep)
-2. "MM Orderflow Hunter" (ວິເຄາະ Volume, Stop Hunt, ຮອຍຕີນເຈົ້າຕະຫຼາດ)
-3. "AI 1M Swarm Consensus" (ສັງລວມສຽງໂຫວດ ແລະ ສົ່ງຄຳສັ່ງ AUTO BUY/SELL)
+ຈົ່ງສ້າງບົດສົນທະນາຖົກຖຽງກັນແບບ Real-Time Chat (ຄື Live Chatroom Twitch) 3 ຂໍ້ຄວາມ ເປັນພາສາລາວທີ່ດຸເດືອດ, ມືອາຊີບ, ເຈາະເລິກເທັກນິກ:
+1. "AI_SMC_Specialist" (Badge: ⚔️ Mod): ວິເຄາະແທ່ງທຽນ, ໄສ້ທຽນ (Wick), Order Block, FVG, ໂຄງສ້າງ BSL/SSL ປັດຈຸບັນ.
+2. "MM_Orderflow_Hunter" (Badge: 🎯 VIP): ວິເຄາະ Volume, ການຫຼອກລາຍຍ່ອຍ (Inducement), ຮອຍຕີນເຈົ້າຕະຫຼາດດັກກິນ Stop Loss.
+3. "AI_Swarm_Consensus" (Badge: 🤖 Bot): ມະຕິສຽງໂຫວດ 1,000,000 Agents, ສັ່ງ ACTION ໃຫ້ຊັດເຈນ (BUY/SELL/WAIT) ພ້ອມບອກແຜນ Entry, TP, SL.
 
-ສົ່ງຕອບເປັນ JSON ຮູບແບບນີ້ເທົ່ານັ້ນ:
+ສົ່ງຕອບເປັນ JSON ຮູບແບບນີ້ເທົ່ານັ້ນ (ຫ້າມໃສ່ Markdown ອື່ນ):
 [
-  {"agentName": "AI SMC Specialist", "message": "..."},
-  {"agentName": "MM Orderflow Hunter", "message": "..."},
-  {"agentName": "AI 1M Swarm Consensus", "message": "..."}
+  {"agent": "AI_SMC_Specialist", "badge": "mod", "color": "text-purple-400", "msg": "..."},
+  {"agent": "MM_Orderflow_Hunter", "badge": "vip", "color": "text-cyan-400", "msg": "..."},
+  {"agent": "AI_Swarm_Consensus", "badge": "bot", "color": "text-amber-400", "msg": "..."}
 ]`;
 
     const completion = await ai.chat.completions.create({
       model: AI_MODEL,
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 450,
-      temperature: 0.6
+      max_tokens: 550,
+      temperature: 0.7
     });
 
     const cleaned = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(cleaned);
 
-    cachedDebateMessages = [
-      { agentName: "AI SMC Specialist", color: "text-purple-400", icon: "fa-solid fa-bolt", time: timeStr, message: parsed[0].message },
-      { agentName: "MM Orderflow Hunter", color: "text-cyan-400", icon: "fa-solid fa-radar", time: timeStr, message: parsed[1].message },
-      { agentName: "AI 1M Swarm Consensus", color: "text-yellow-400", icon: "fa-solid fa-brain", time: timeStr, message: parsed[2].message }
-    ];
-    lastDebateTime = now;
-    return cachedDebateMessages;
+    return parsed.map(item => ({
+      id: Date.now() + Math.random(),
+      time: timeStr,
+      agent: item.agent,
+      badge: item.badge,
+      color: item.color,
+      message: item.msg
+    }));
 
   } catch (err) {
     let m1 = "", m2 = "", m3 = "";
     if (liq.isCleared && liq.signalAction === 'SELL') {
-      m1 = `ກາຟ M15 ທະລຸແນວຕ້ານໄປ Clear BSL ທີ່ $${liq.clearedPrice} ແລ້ວເກີດ Rejection Wick, RSI ຢູ່ທີ່ ${market.rsi.toFixed(1)} ເລີ່ມຫັກຫົວລົງ!`;
-      m2 = `Orderflow ຢືນຢັນ Stop Loss ຂາ Sell ຖືກກິນໄປແລ້ວກວ່າ ${liq.volumeEstimated}. ເຈົ້າຕະຫຼາດເລີ່ມຖິ້ມແຮງຂາຍ (Displacement Down)!`;
-      m3 = `ມະຕິ 1,000,000 Agents ອອກຄຳສັ່ງ: "AUTO SELL NOW" ທີ່ $${liq.suggestedEntry}, ຕັ້ງ SL $${liq.suggestedSL}, ເປົ້າ TP $${liq.suggestedTP}!`;
+      m1 = `ກຣາຟແທ່ງ M15 ພຸ່ງໄປ Clear BSL ເໜືອ $${liq.clearedPrice} ແລ້ວດຶງໄສ້ກັບ (Rejection Wick) ຍາວຫຼາຍ, RSI ຢູ່ທີ່ ${market.rsi.toFixed(1)} ເກີດ Bearish Divergence ຊັດເຈນ!`;
+      m2 = `Orderflow ຈັບໄດ້ Stop Hunt ຂາ Sell ຖືກກິນໄປແລ້ວ ${liq.volumeEstimated}. ເຈົ້າຕະຫຼາດເລີ່ມຖິ້ມ Volume ຂາຍແຮງດັນໃຫ້ຫຼຸດ EMA10 ($${market.ema10.toFixed(2)})!`;
+      m3 = `ມະຕິ Swarm 1M Agents ຢືນຢັນ: ຕັດສິນໃຈ "AUTO SELL" ທັນທີທີ່ $${liq.suggestedEntry}, ວາງ SL $${liq.suggestedSL}, ເປົ້າ TP $${liq.suggestedTP}!`;
     } else if (liq.isCleared && liq.signalAction === 'BUY') {
-      m1 = `ເກີດ Liquidity Sweep ຂາລຸ່ມແລ້ວ! ລາຄາແທງກິນ SSL ທີ່ $${liq.clearedPrice} ແລ້ວດຶງກັບເຂົ້າມາຍືນເໜືອ EMA10 ($${market.ema10.toFixed(2)}) ທັນທີ!`;
-      m2 = `ວໍລຸ່ມລາຍຍ່ອຍ Panic Sell ຖືກເຈົ້າຕະຫຼາດດູດຊື້ຄືນໝົດແລ້ວ. ໂຄງສ້າງກຣາຟຕອນນີ້ພ້ອມກັບຕົວແຮງ!`;
-      m3 = `ມະຕິ 1,000,000 Agents ອອກຄຳສັ່ງ: "AUTO BUY NOW" ທີ່ $${liq.suggestedEntry}, ຕັ້ງ SL $${liq.suggestedSL}, ເປົ້າ TP $${liq.suggestedTP}!`;
+      m1 = `ເກີດ Liquidity Sweep ຂາລຸ່ມ! ລາຄາຖິ້ມດາວໄປກວາດ SSL ທີ່ $${liq.clearedPrice} ແລ້ວເກີດ Bullish Pinbar ດຶງກັບເຂົ້າມາຍືນເໜືອແນວຮັບ $${liq.minorSupport}!`;
+      m2 = `ເຈົ້າຕະຫຼາດບີບໃຫ້ລາຍຍ່ອຍ Panic Sell ສຳເລັດແລ້ວດູດຊື້ຄືນໝົດກ້ອນ. Delta Volume ພິກກັບມາເປັນບວກແຮງຫຼາຍ!`;
+      m3 = `ມະຕິ Swarm 1M Agents ຢືນຢັນ: ຕັດສິນໃຈ "AUTO BUY" ທັນທີທີ່ $${liq.suggestedEntry}, ວາງ SL $${liq.suggestedSL}, ເປົ້າ TP $${liq.suggestedTP}!`;
     } else {
-      m1 = `ກາຟ Spot Gold ປັດຈຸບັນລາຄາ $${p} ຍັງແກວ່ງຕົວໃນກອບ $${liq.majorSupport} - $${liq.majorResistance}, RSI ${market.rsi.toFixed(1)} ບົ່ງບອກເຖິງການສະສົມ Liquidity.`;
-      m2 = `ເຈົ້າຕະຫຼາດຍັງບໍ່ໄດ້ເລືອກຂ້າງ Sweep, ຫ້າມເປີດອໍເດີກາງກອບເພາະສ່ຽງຖືກແກວ່ງກິນ Stop Loss ທັງສອງຝັ່ງ.`;
-      m3 = `ມະຕິ AI Swarm ຢືນຢັນ: "WAITING FOR LIQUIDITY SWEEP" ເຝົ້າລະວັງການທະລຸ $${liq.majorResistance} ຫຼື ຫຼຸດ $${liq.majorSupport} ກ່ອນ!`;
+      m1 = `ກຣາຟ XAU/USD ຕອນນີ້ລາຄາ $${p} ຍັງແກວ່ງຕົວ SideWay ໃນກອບ $${liq.minorSupport} - $${liq.minorResistance}, RSI ${market.rsi.toFixed(1)} ບົ່ງບອກເຖິງການສ້າງ Inducement Pool.`;
+      m2 = `Orderflow ຍັງເຫັນເຈົ້າຕະຫຼາດດັກຕັ້ງ Limit Orders ທັງສອງຝັ່ງ, ຢ່າຟ້າວ Follow Buy/Sell ກາງກອບ ສ່ຽງຖືກກິນ SL ທັງສອງທາງ.`;
+      m3 = `ມະຕິ Swarm: "WAIT FOR SWEEP" ລໍຖ້າໃຫ້ລາຄາທະລຸ $${liq.majorResistance} ຫຼື ຫຼຸດ $${liq.majorSupport} ແລ້ວດຶງໄສ້ກັບ ຈຶ່ງອອກອໍເດີ!`;
     }
 
-    cachedDebateMessages = [
-      { agentName: "AI SMC Specialist", color: "text-purple-400", icon: "fa-solid fa-bolt", time: timeStr, message: m1 },
-      { agentName: "MM Orderflow Hunter", color: "text-cyan-400", icon: "fa-solid fa-radar", time: timeStr, message: m2 },
-      { agentName: "AI 1M Swarm Consensus", color: "text-yellow-400", icon: "fa-solid fa-brain", time: timeStr, message: m3 }
+    return [
+      { id: Date.now() + 1, time: timeStr, agent: "AI_SMC_Specialist", badge: "mod", color: "text-purple-400", message: m1 },
+      { id: Date.now() + 2, time: timeStr, agent: "MM_Orderflow_Hunter", badge: "vip", color: "text-cyan-400", message: m2 },
+      { id: Date.now() + 3, time: timeStr, agent: "AI_Swarm_Consensus", badge: "bot", color: "text-amber-400", message: m3 }
     ];
-    return cachedDebateMessages;
   }
 }
 
