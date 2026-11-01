@@ -18,8 +18,10 @@ const TWELVE_DATA_KEY = process.env.TWELVE_DATA_API_KEY || "";
 const FMP_KEY = process.env.FMP_API_KEY || "";
 
 // ============================================================
-// 1. TRI-BRAIN AI CLIENTS
+// 1. TRI-BRAIN AI CLIENTS (Groq + Gemini + OpenRouter)
 // ============================================================
+
+// 1.1 GROQ (Speed Engine)
 const groqClient = new OpenAI({
   apiKey: process.env.GROQ_API_KEY || "dummy_key",
   baseURL: "https://api.groq.com/openai/v1"
@@ -40,6 +42,7 @@ async function callGroqAI(prompt, systemInstruction = "") {
   return completion.choices[0].message.content.trim();
 }
 
+// 1.2 GEMINI (Lao Linguist & Macro Engine)
 const GEMINI_MODELS = ["gemma-4-26b-a4b-it", "gemini-flash-latest", "gemini-3.5-flash-lite"];
 async function callGeminiAI(prompt, systemInstruction = "") {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -66,6 +69,7 @@ async function callGeminiAI(prompt, systemInstruction = "") {
   throw new Error("Gemini models busy");
 }
 
+// 1.3 OPENROUTER (DeepSeek Quant Logic Engine)
 async function callOpenRouterAI(prompt, systemInstruction = "") {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("No OpenRouter Key");
@@ -95,6 +99,7 @@ async function callOpenRouterAI(prompt, systemInstruction = "") {
   throw new Error(data.error?.message || "OpenRouter Error");
 }
 
+// 1.4 SMART ORCHESTRATOR
 async function executeTriBrainAI(primaryEngine, prompt, systemInstruction) {
   const engines = [];
   if (primaryEngine === 'openrouter') engines.push(callOpenRouterAI, callGeminiAI, callGroqAI);
@@ -111,11 +116,12 @@ async function executeTriBrainAI(primaryEngine, prompt, systemInstruction) {
 }
 
 // ============================================================
-// 2. ດຶງ 1,000 ແທ່ງທຽນ M15 ຈາກ TWELVE DATA (REAL QUANT ENGINE)
+// 2. ລະບົບດຶງ 1,000 ແທ່ງ M15 (TWELVE DATA + BINANCE BACKUP)
 // ============================================================
 let cachedCandles1000 = [];
 let lastCandlesFetchTime = 0;
 let lastKnownRealPrice = 3875.50;
+let activeDataSource = "Twelve Data"; // ບອກວ່າມາຈາກແຫຼ່ງໃດ
 let cachedMacroNews = null;
 let lastMacroFetchTime = 0;
 let cachedRedNewsData = null;
@@ -131,29 +137,51 @@ let persistentSignal = {
   tp3: "--",
   tp4: "--",
   sl: "--",
-  rrRatio: "1 : 3.4",
+  rrRatio: "1 : 3.8",
   setupName: "SMC 1,000-Candle Engine ກຳລັງສະແກນ...",
-  setupDescription: "AI ກຳລັງວິເຄາະ BSL/SSL ຈາກ 1,000 ແທ່ງທຽນ M15 ຕົວຈິງ...",
+  setupDescription: "AI ກຳລັງວິເຄາະ BSL/SSL ຈາກ 1,000 ແທ່ງ M15 ຕົວຈິງ...",
   votes: { deepseek: "WAIT", gemini: "WAIT", groq: "WAIT" },
   confidence: "85%",
   timestamp: Date.now()
 };
 
+// ຟັງຊັນສຳຮອງ: ດຶງ 1,000 ແທ່ງ M15 ຈາກ Binance PAXG (ຄຳແທ້ 1:1 ບໍ່ຕ້ອງໃຊ້ Key)
+async function fetchBackupGoldCandles() {
+  try {
+    const url = "https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=1000";
+    const res = await axios.get(url, { timeout: 4500 });
+    if (Array.isArray(res.data) && res.data.length > 50) {
+      return res.data.map(c => ({
+        datetime: new Date(c[0]).toISOString(),
+        open: parseFloat(c[1]),
+        high: parseFloat(c[2]),
+        low: parseFloat(c[3]),
+        close: parseFloat(c[4]),
+        volume: parseFloat(c[5])
+      }));
+    }
+  } catch (e) {
+    console.warn("⚠️ Binance PAXG backup fetch failed:", e.message);
+  }
+  return null;
+}
+
+// ຟັງຊັນຫຼັກດຶງ 1,000 ແທ່ງທຽນ M15 ພ້ອມລະບົບ Auto-Failover
 async function get1000M15Candles() {
   const now = Date.now();
-  // Cache 90 ວິນາທີ (ເພື່ອປະຢັດໂຄຕາຟຣີ 8 ຄັ້ງ/ນາທີ)
+  // Cache 90 ວິນາທີ ເພື່ອປະຢັດ Request
   if (cachedCandles1000.length > 0 && (now - lastCandlesFetchTime < 90000)) {
     return cachedCandles1000;
   }
 
+  // 1. ລອງດຶງຈາກ Twelve Data ກ່ອນ (Primary)
   if (TWELVE_DATA_KEY) {
     try {
       const url = `https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=15min&outputsize=1000&apikey=${TWELVE_DATA_KEY}`;
-      const res = await axios.get(url, { timeout: 8000 });
+      const res = await axios.get(url, { timeout: 6000 });
       
-      if (res.data && res.data.values && Array.isArray(res.data.values) && res.data.values.length > 50) {
-        // Twelve Data ສົ່ງມາແບບ Newest First -> ປ່ຽນໃຫ້ເປັນ Oldest to Newest
-        const parsed = res.data.values.map(c => ({
+      if (res.data?.values && Array.isArray(res.data.values) && res.data.values.length > 50) {
+        cachedCandles1000 = res.data.values.map(c => ({
           datetime: c.datetime,
           open: parseFloat(c.open),
           high: parseFloat(c.high),
@@ -162,23 +190,34 @@ async function get1000M15Candles() {
           volume: parseFloat(c.volume) || 100
         })).reverse();
 
-        cachedCandles1000 = parsed;
         lastCandlesFetchTime = now;
-        lastKnownRealPrice = parsed[parsed.length - 1].close;
-        console.log(`✅ [Twelve Data] ດຶງ 1,000 ແທ່ງ M15 ສຳເລັດ! ລາຄາລ່າສຸດ: $${lastKnownRealPrice}`);
+        lastKnownRealPrice = cachedCandles1000[cachedCandles1000.length - 1].close;
+        activeDataSource = "Twelve Data";
+        console.log(`✅ [Twelve Data] ດຶງ 1,000 ແທ່ງ M15 ສຳເລັດ! ລາຄາ: $${lastKnownRealPrice}`);
         return cachedCandles1000;
       }
     } catch (err) {
-      console.warn("⚠️ Twelve Data 1000 candles fetch busy/limit, using cache.");
+      console.warn("⚠️ Twelve Data ຕິດ Limit/Error! ກຳລັງສະຫຼັບໄປຫາ Binance PAXG (Backup Engine)...");
     }
   }
 
-  // Fallback ຖ້າ API ຕິດ Limit: ໃຊ້ Cache ເກົ່າ
+  // 2. ຖ້າ Twelve Data ຫຼຸດ ➔ ສະຫຼັບມາ Binance PAXG/USDT ທັນທີ!
+  const backupCandles = await fetchBackupGoldCandles();
+  if (backupCandles && backupCandles.length > 50) {
+    cachedCandles1000 = backupCandles;
+    lastCandlesFetchTime = now;
+    lastKnownRealPrice = backupCandles[backupCandles.length - 1].close;
+    activeDataSource = "Binance PAXG (1:1 Gold)";
+    console.log(`✅ [Binance PAXG Backup] ດຶງ 1,000 ແທ່ງ M15 ສຳເລັດ! ລາຄາ: $${lastKnownRealPrice}`);
+    return cachedCandles1000;
+  }
+
+  // 3. ຖ້າທັງສອງແຫຼ່ງຍັງຕິດຂັດ ➔ ໃຊ້ Cache ໃນ RAM
   if (cachedCandles1000.length > 0) {
     return cachedCandles1000;
   }
 
-  // ສ້າງແທ່ງທຽນຈຳລອງສະເພາະຕອນເລີ່ມຕົ້ນຖ້າ API ບໍ່ຕອບສະໜອງ
+  // 4. ສ້າງແທ່ງທຽນຕໍ່ເນື່ອງຈາກລາຄາແທ້ລ່າສຸດ (ປ້ອງກັນເຊີບເວີ Crash)
   const mockCandles = [];
   let p = lastKnownRealPrice;
   for (let i = 0; i < 1000; i++) {
@@ -217,18 +256,16 @@ function runAlgorithmicSMCOn1000Candles(candles) {
 
   for (let i = 5; i < total - 5; i++) {
     const bar = candles[i];
-    // Swing High: ສູງກວ່າ 4 ແທ່ງຊ້າຍ ແລະ 4 ແທ່ງຂວາ
     const isHigh = candles.slice(i - 4, i).every(c => c.high <= bar.high) &&
                    candles.slice(i + 1, i + 5).every(c => c.high <= bar.high);
     if (isHigh) swingHighs.push({ price: bar.high, index: i, time: bar.datetime });
 
-    // Swing Low: ຕໍ່າກວ່າ 4 ແທ່ງຊ້າຍ ແລະ 4 ແທ່ງຂວາ
     const isLow = candles.slice(i - 4, i).every(c => c.low >= bar.low) &&
                   candles.slice(i + 1, i + 5).every(c => c.low >= bar.low);
     if (isLow) swingLows.push({ price: bar.low, index: i, time: bar.datetime });
   }
 
-  // 2. ຄັດເລືອກ Key Levels (R1, R2, S1, S2) ຕົວຈິງທີ່ໃກ້ກັບລາຄາປັດຈຸບັນ
+  // 2. ຄັດເລືອກ Key Levels (R1, R2, S1, S2)
   const higherSwings = swingHighs.filter(s => s.price > p).sort((a, b) => a.price - b.price);
   const lowerSwings = swingLows.filter(s => s.price < p).sort((a, b) => b.price - a.price);
 
@@ -237,7 +274,7 @@ function runAlgorithmicSMCOn1000Candles(candles) {
   const s1 = lowerSwings[0]?.price || parseFloat((p - 12.5).toFixed(2));
   const s2 = lowerSwings[1]?.price || parseFloat((p - 25.0).toFixed(2));
 
-  // 3. ກວດຈັບ Volume Spike (Volume > 1.8x ຂອງ SMA 20)
+  // 3. ກວດຈັບ Volume Spike
   const last20Volumes = candles.slice(-21, -1).map(c => c.volume);
   const avgVolume20 = last20Volumes.reduce((a, b) => a + b, 0) / 20;
   const isVolumeSpike = currentCandle.volume > (avgVolume20 * 1.8) || prevCandle.volume > (avgVolume20 * 1.8);
@@ -246,7 +283,6 @@ function runAlgorithmicSMCOn1000Candles(candles) {
     : `$850M - $1.2B USD (Normal Market Flow)`;
 
   // 4. ກວດຈັບ Real Liquidity Sweep (Wick Rejection ຈາກແທ່ງ M15 ລ່າສຸດ)
-  // ກໍລະນີ BUY: ແທ່ງທຽນແທງທະລຸ SSL (ແນວຮັບ) ແຕ່ດຶງໄສ້ກັບມາປິດຕັ້ງຢູ່ເໜືອ SSL (Bullish Rejection)
   const recent3 = candles.slice(-3);
   let sweepDetected = false;
   let sweepType = null;
@@ -267,7 +303,7 @@ function runAlgorithmicSMCOn1000Candles(candles) {
     }
   }
 
-  // 5. ແຈ້ງເຕືອນ ແລະ ສົ່ງໃຫ້ Tri-Brain Committee
+  // 5. ແຈ້ງເຕືອນສັນຍານ
   if (sweepDetected && !persistentSignal.isAutoTriggered) {
     const isBuy = sweepType === "BUY";
     const sl = isBuy ? parseFloat((s1 - 8.0).toFixed(2)) : parseFloat((r1 + 8.0).toFixed(2));
@@ -294,7 +330,7 @@ function runAlgorithmicSMCOn1000Candles(candles) {
     };
   }
 
-  // 6. ຕັດເອົາແທ່ງທຽນແທ້ 16 ແທ່ງລ່າສຸດ ສົ່ງໄປໃຫ້ Canvas ແຕ້ມແບບ Real-time
+  // 6. ຕັດເອົາແທ່ງທຽນແທ້ 16 ແທ່ງລ່າສຸດ ສົ່ງໄປໃຫ້ Canvas ແຕ້ມ
   const recent16Candles = candles.slice(-16).map(c => ({
     datetime: c.datetime,
     open: c.open,
@@ -305,7 +341,6 @@ function runAlgorithmicSMCOn1000Candles(candles) {
     isSweep: sweepCandle && c.datetime === sweepCandle.datetime
   }));
 
-  // 7. ຄຳນວນ Trend ຈາກ EMA50
   const ema50 = candles.slice(-50).reduce((acc, cur) => acc + cur.close, 0) / 50;
   const htfTrend = p > ema50 ? "BULLISH" : "BEARISH";
 
@@ -314,6 +349,7 @@ function runAlgorithmicSMCOn1000Candles(candles) {
     r1, r2, s1, s2,
     htfTrend,
     volumeDisplay,
+    activeDataSource,
     isCleared: persistentSignal.isAutoTriggered,
     signalAction: persistentSignal.type,
     clearedPrice: persistentSignal.type === "BUY" ? s1 : r1,
@@ -350,7 +386,7 @@ async function getOrGenerateLiveDebate(smcData) {
 
   try {
     const prompt = `ທ່ານຄື 3 AI ຜູ້ຊ່ຽວຊານເທຣດທອງຄຳ XAU/USD (Tri-Brain Quant Committee):
-- ລາຄາຄຳ Real-time (1,000 M15 Candles): $${p}
+- ລາຄາຄຳ Real-time (${smcData.activeDataSource} 1,000 M15): $${p}
 - Trend: ${smcData.htfTrend}
 - Swing High BSL (ແນວຕ້ານແທ້): $${smcData.r1} | $${smcData.r2}
 - Swing Low SSL (ແນວຮັບແທ້): $${smcData.s1} | $${smcData.s2}
@@ -389,7 +425,7 @@ async function getOrGenerateLiveDebate(smcData) {
 
   } catch (err) {
     return [
-      { id: Date.now() + 1, time: timeStr, agent: "AI_SMC_Specialist", badge: "mod", color: "text-purple-400", message: `SMC 1,000 ແທ່ງ M15 ຢືນຢັນລາຄາ $${p}. ແນວຮັບ SSL: $${smcData.s1}, ແນວຕ້ານ BSL: $${smcData.r1}.` },
+      { id: Date.now() + 1, time: timeStr, agent: "AI_SMC_Specialist", badge: "mod", color: "text-purple-400", message: `SMC 1,000 ແທ່ງ (${smcData.activeDataSource}) ຢືນຢັນລາຄາ $${p}. ແນວຮັບ SSL: $${smcData.s1}, ແນວຕ້ານ BSL: $${smcData.r1}.` },
       { id: Date.now() + 2, time: timeStr, agent: "MM_Orderflow_Hunter", badge: "vip", color: "text-cyan-400", message: `Orderflow ຢືນຢັນ: ${smcData.volumeDisplay}. ມະຕິໂຫວດ [${persistentSignal.type}]!` },
       { id: Date.now() + 3, time: timeStr, agent: "AI_Swarm_Consensus", badge: "bot", color: "text-amber-400", message: `ມະຕິ Swarm: ຄຳສັ່ງ [${persistentSignal.type}]. Entry: ${persistentSignal.entry}, SL: ${persistentSignal.sl}, TP1: ${persistentSignal.tp1}!` }
     ];
@@ -423,7 +459,6 @@ async function getAdvancedGeopoliticalNews() {
     return cachedMacroNews;
   }
 
-  // 1. ດຶງຂ່າວ Trump ແທ້ໆ ແລະ ກວດສອບອາຍຸ 7 ມື້
   let trumpRealData = null;
   try {
     const trumpRss = await axios.get('https://news.google.com/rss/search?q=Trump+tariff+OR+Trump+dollar+OR+Trump+economy+gold&hl=en-US&gl=US&ceid=US:en', {
@@ -477,7 +512,6 @@ async function getAdvancedGeopoliticalNews() {
     };
   }
 
-  // 2. ດຶງຂ່າວໂລກ FMP & Google RSS
   let rawHeadlines = await fetchFMPGeneralNews();
   if (rawHeadlines.length === 0) {
     try {
@@ -602,7 +636,7 @@ async function getAdvancedRedNewsWithTriBrain(currentPrice) {
 }
 
 // ============================================================
-// 7. API ENDPOINTS (SYNCHRONIZED WITH 1,000 M15 CANDLES)
+// 7. API ENDPOINTS
 // ============================================================
 app.get('/api/analysis', async (req, res) => {
   try {
@@ -614,7 +648,7 @@ app.get('/api/analysis', async (req, res) => {
       currentPrice: smc.price.toFixed(2),
       isCleared: persistentSignal.isAutoTriggered,
       trend: {
-        direction: `Twelve Data 1,000-Bar ${smc.htfTrend} (${persistentSignal.setupName})`,
+        direction: `${smc.activeDataSource} ${smc.htfTrend} (${persistentSignal.setupName})`,
         strength: persistentSignal.isAutoTriggered ? `SMC Confirmed (${persistentSignal.confidence})` : "Scanning 1,000 Candles Live",
         votesForSignal: 965000,
         votesTotal: 1000000,
@@ -657,7 +691,7 @@ app.get('/api/swarm-live-debate', async (req, res) => {
       success: true,
       marketSnapshot: {
         price: smc.price.toFixed(2),
-        rsi: "M15 SMC",
+        rsi: `${smc.activeDataSource} M15`,
         status: persistentSignal.type !== 'WAIT' ? `${persistentSignal.type}: ${persistentSignal.setupName}` : "AI COMMITTEE ACTIVE"
       },
       messages
@@ -694,7 +728,7 @@ app.post('/api/chat', async (req, res) => {
     const smc = runAlgorithmicSMCOn1000Candles(candles);
 
     const systemPrompt = `ທ່ານຄື AI ຜູ້ຊ່ຽວຊານດ້ານການເທຣດທອງຄຳ XAU/USD (SMC 1,000 M15 Candles Engine):
-- ລາຄາຄຳ Real-time: $${smc.price.toFixed(2)}
+- ລາຄາຄຳ Real-time (${smc.activeDataSource}): $${smc.price.toFixed(2)}
 - Trend D1/H4: ${smc.htfTrend}
 - Swing High BSL (ແນວຕ້ານແທ້): $${smc.r1} | $${smc.r2}
 - Swing Low SSL (ແນວຮັບແທ້): $${smc.s1} | $${smc.s2}
@@ -717,7 +751,7 @@ app.post('/api/chat', async (req, res) => {
   } catch (error) {
     res.json({ 
       success: true, 
-      answer: `ລາຄາຄຳປັດຈຸບັນ (1,000 M15 SMC) ແມ່ນ: $${lastKnownRealPrice.toFixed(2)}.` 
+      answer: `ລາຄາຄຳປັດຈຸບັນແມ່ນ: $${lastKnownRealPrice.toFixed(2)}.` 
     });
   }
 });
@@ -728,5 +762,5 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Gold AI 1,000 M15 Candles SMC Engine running on port ${PORT}`);
+  console.log(`🚀 Gold AI 1,000 M15 Candles SMC Engine (Binance Backup Enabled) running on port ${PORT}`);
 });
