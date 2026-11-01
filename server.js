@@ -11,13 +11,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-// API KEYS
+// ============================================================
+// 0. API KEYS
+// ============================================================
 const TWELVE_DATA_KEY = process.env.TWELVE_DATA_API_KEY || "";
 const FMP_KEY = process.env.FMP_API_KEY || "";
 
 // ============================================================
-// 1. TRI-BRAIN AI CLIENTS
+// 1. TRI-BRAIN AI CLIENTS (Groq + Gemini + OpenRouter)
 // ============================================================
+
+// 1.1 GROQ (Speed Engine)
 const groqClient = new OpenAI({
   apiKey: process.env.GROQ_API_KEY || "dummy_key",
   baseURL: "https://api.groq.com/openai/v1"
@@ -38,6 +42,7 @@ async function callGroqAI(prompt, systemInstruction = "") {
   return completion.choices[0].message.content.trim();
 }
 
+// 1.2 GEMINI (Lao Linguist & Macro Engine)
 const GEMINI_MODELS = ["gemma-4-26b-a4b-it", "gemini-flash-latest", "gemini-3.5-flash-lite"];
 async function callGeminiAI(prompt, systemInstruction = "") {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -64,6 +69,7 @@ async function callGeminiAI(prompt, systemInstruction = "") {
   throw new Error("Gemini models busy");
 }
 
+// 1.3 OPENROUTER (DeepSeek Quant Logic Engine)
 async function callOpenRouterAI(prompt, systemInstruction = "") {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("No OpenRouter Key");
@@ -93,6 +99,7 @@ async function callOpenRouterAI(prompt, systemInstruction = "") {
   throw new Error(data.error?.message || "OpenRouter Error");
 }
 
+// 1.4 SMART ORCHESTRATOR
 async function executeTriBrainAI(primaryEngine, prompt, systemInstruction) {
   const engines = [];
   if (primaryEngine === 'openrouter') engines.push(callOpenRouterAI, callGeminiAI, callGroqAI);
@@ -109,11 +116,9 @@ async function executeTriBrainAI(primaryEngine, prompt, systemInstruction) {
 }
 
 // ============================================================
-// 2. ລະບົບດຶງລາຄາຄຳທີ່ແນ່ນອນ (REAL-TIME STABLE PRICE FEED)
+// 2. ລະບົບລາຄາຄຳທີ່ແນ່ນອນ (REAL-TIME STABLE PRICE FEED)
 // ============================================================
-
-// ບັນທຶກລາຄາແທ້ລ່າສຸດໄວ້ (Default ເປັນລາຄາຕະຫຼາດປັດຈຸບັນ)
-let lastKnownRealPrice = 3875.50; //
+let lastKnownRealPrice = 3875.50; // ຈື່ລາຄາແທ້ລ່າສຸດໄວ້ສະເໝີ
 let cachedMarketData = null;
 let lastMarketFetchTime = 0;
 let lastCommitteeTime = 0;
@@ -151,7 +156,7 @@ async function fetchTwelveDataPrice() {
   return null;
 }
 
-// ແຫຼ່ງທີ 2: Financial Modeling Prep Commodity (Gold)
+// ແຫຼ່ງທີ 2: Financial Modeling Prep (Gold GCUSD)
 async function fetchFMPGoldPrice() {
   if (!FMP_KEY) return null;
   try {
@@ -184,12 +189,12 @@ async function fetchTradingViewPrice() {
         return {
           price: parseFloat(p.toFixed(2)),
           changePct: parseFloat(d[1]?.toFixed(2)) || 0,
-          high: parseFloat(d[2]?.toFixed(2)) || p + 5,
-          low: parseFloat(d[3]?.toFixed(2)) || p - 5,
+          high: parseFloat(d[2]?.toFixed(2)) || p + 6,
+          low: parseFloat(d[3]?.toFixed(2)) || p - 6,
           rsi: parseFloat(d[4]?.toFixed(1)) || 50.0,
-          ema10: parseFloat(d[5]?.toFixed(2)) || p - 1.5,
-          ema20: parseFloat(d[6]?.toFixed(2)) || p - 3.0,
-          ema50: parseFloat(d[7]?.toFixed(2)) || p - 6.0,
+          ema10: parseFloat(d[5]?.toFixed(2)) || p - 2.0,
+          ema20: parseFloat(d[6]?.toFixed(2)) || p - 4.5,
+          ema50: parseFloat(d[7]?.toFixed(2)) || p - 9.0,
           atr: parseFloat(d[8]?.toFixed(2)) || 14.5
         };
       }
@@ -198,7 +203,7 @@ async function fetchTradingViewPrice() {
   return null;
 }
 
-// ຟັງຊັນສັງລວມ: ລັອກລາຄາໃຫ້ຄົງທີ່ (Cache 15 ວິນາທີ ປ້ອງກັນການໂດດໄປມາ)
+// ດຶງລາຄາຄຳແບບລັອກຄົງທີ່ (Cache 15 ວິນາທີ ປ້ອງກັນຕົວເລກໂດດໄປມາ)
 async function getTradingViewOandaData() {
   const now = Date.now();
   if (cachedMarketData && (now - lastMarketFetchTime < 15000)) {
@@ -208,17 +213,12 @@ async function getTradingViewOandaData() {
   let marketObj = await fetchTradingViewPrice();
   let price = marketObj ? marketObj.price : null;
 
-  // ຖ້າ TradingView ບໍ່ຕອບສະໜອງ ➔ ໃຊ້ Twelve Data
   if (!price) {
     price = await fetchTwelveDataPrice();
   }
-
-  // ຖ້າ Twelve Data ບໍ່ຕອບສະໜອງ ➔ ໃຊ້ FMP
   if (!price) {
     price = await fetchFMPGoldPrice();
   }
-
-  // ຖ້າທັງໝົດຍັງຕິດ Limit ➔ ໃຊ້ລາຄາແທ້ລ່າສຸດທີ່ເຄີຍດຶງໄດ້ (ຫ້າມໂດດກັບໄປ $2895 ເດັດຂາດ!)
   if (!price) {
     price = lastKnownRealPrice;
   } else {
@@ -234,7 +234,7 @@ async function getTradingViewOandaData() {
   const ema50 = marketObj?.ema50 || price - 9.0;
   const changePct = marketObj?.changePct || 0.12;
 
-  // ແນວຮັບ-ແນວຕ້ານທີ່ຄົງທີ່ ແລະ ຊັດເຈນ ຕາມ ATR
+  // ແນວຮັບ-ແນວຕ້ານຄົງທີ່ຕາມ ATR
   const keyResistanceH1 = parseFloat((price + atr * 1.8).toFixed(2));
   const keySupportH1 = parseFloat((price - atr * 1.8).toFixed(2));
 
@@ -361,13 +361,13 @@ function evaluateSMCStrategy(market) {
 
   if (market.htfTrend === "BEARISH" || market.indicators.rsi > 60 || p >= minorResistance) {
     if (p >= minorResistance) {
-      candidate = { action: "SELL", title: "Sell ກໍລະນີ 1: Sweep BSL ແນວຕ້ານ" };
+      candidate = { action: "SELL", title: "Sell: Sweep BSL ແນວຕ້ານ" };
     }
   }
 
   if (!candidate && (market.htfTrend === "BULLISH" || market.indicators.rsi < 40 || p <= minorSupport)) {
     if (p <= minorSupport) {
-      candidate = { action: "BUY", title: "Buy ກໍລະນີ 1: Sweep SSL ແນວຮັບ" };
+      candidate = { action: "BUY", title: "Buy: Sweep SSL ແນວຮັບ" };
     }
   }
 
@@ -399,7 +399,7 @@ function evaluateSMCStrategy(market) {
 }
 
 // ============================================================
-// 4. TWITCH LIVE DEBATE (Real-Time Synchronized)
+// 4. TWITCH LIVE DEBATE
 // ============================================================
 async function getOrGenerateLiveDebate(market, liq) {
   const p = market.price.toFixed(2);
@@ -424,7 +424,7 @@ async function getOrGenerateLiveDebate(market, liq) {
 2. "MM_Orderflow_Hunter" (Badge: 🎯 VIP): ວິເຄາະ Volume, Stop Hunt ຮອຍຕີນເຈົ້າຕະຫຼາດ.
 3. "AI_Swarm_Consensus" (Badge: 🤖 Bot): ຢືນຢັນຄຳສັ່ງ [${persistentSignal.type}] ພ້ອມ Entry, SL, TP.
 
-ສົ່ງຕອບເປັນ JSON ເທົ່ານັ້ນ:
+ສົ່ງຕອບເປັນ JSON:
 [
   {"agent": "AI_SMC_Specialist", "badge": "mod", "color": "text-purple-400", "msg": "..."},
   {"agent": "MM_Orderflow_Hunter", "badge": "vip", "color": "text-cyan-400", "msg": "..."},
@@ -460,7 +460,7 @@ async function getOrGenerateLiveDebate(market, liq) {
 }
 
 // ============================================================
-// 5. GEOPOLITICAL MACRO SENTINEL & RED NEWS
+// 5. GEOPOLITICAL MACRO SENTINEL & TRUMP REAL FEED (7-DAY FILTER)
 // ============================================================
 async function fetchFMPGeneralNews() {
   if (!FMP_KEY) return [];
@@ -479,13 +479,71 @@ async function fetchFMPGeneralNews() {
 
 async function getAdvancedGeopoliticalNews() {
   const now = Date.now();
-  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000; // ເວລາ 7 ມື້ (ມິນລີວິນາທີ)
 
   if (cachedMacroNews && (now - lastMacroFetchTime < 10 * 60 * 1000)) {
+    // ກັ່ນຕອງຂ່າວເກີນ 7 ມື້ຖິ້ມອັດຕະໂນມັດ
     cachedMacroNews.news = cachedMacroNews.news.filter(n => (now - n.timestamp) <= SEVEN_DAYS_MS);
     return cachedMacroNews;
   }
 
+  // 1. ດຶງຂ່າວ Trump ແທ້ໆ ຈາກ Google News RSS
+  let trumpRealData = null;
+  try {
+    const trumpRss = await axios.get('https://news.google.com/rss/search?q=Trump+tariff+OR+Trump+dollar+OR+Trump+economy+gold&hl=en-US&gl=US&ceid=US:en', {
+      timeout: 4500,
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    const xml = trumpRss.data || "";
+    const firstItem = (xml.match(/<item>([\s\S]*?)<\/item>/) || [])[1];
+
+    if (firstItem) {
+      const rawTitle = (firstItem.match(/<title>(.*?)<\/title>/) || [])[1] || "";
+      const pubDate = (firstItem.match(/<pubDate>(.*?)<\/pubDate>/) || [])[1] || "";
+      const source = (firstItem.match(/<source[^>]*>(.*?)<\/source>/) || [])[1] || "US Media";
+      const itemTimestamp = new Date(pubDate).getTime();
+
+      // ກວດສອບອາຍຸຂ່າວ: ຖ້າຢູ່ພາຍໃນ 7 ມື້ ໃຫ້ແປ ແລະ ສະແດງຜົນ
+      if ((now - itemTimestamp) <= SEVEN_DAYS_MS) {
+        const promptTrump = `ແປຫົວຂໍ້ຂ່າວ Trump ນີ້ເປັນພາສາລາວ 100% ແລະ ວິເຄາະຜົນຕໍ່ທອງຄຳ:
+ຫົວຂໍ້: "${rawTitle}"
+ຕອບເປັນ JSON ຮູບແບບນີ້:
+{"titleLao": "...", "analysis": "...", "goldEffect": "Gold Bullish 🚀 ຫຼື Gold Bearish 🔻"}`;
+
+        try {
+          const resAI = await executeTriBrainAI('gemini', promptTrump, "Financial translator");
+          const cleaned = resAI.replace(/```json/g, '').replace(/```/g, '').trim();
+          const parsedTrump = JSON.parse(cleaned);
+
+          trumpRealData = {
+            isExpired: false,
+            post: `Trump / ${source}: "${parsedTrump.titleLao || rawTitle}"`,
+            source: source,
+            time: new Date(itemTimestamp).toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane', dateStyle: 'medium', timeStyle: 'short' }),
+            timestamp: itemTimestamp,
+            impactLevel: "ສຳຄັນສູງ 🚨",
+            aiAnalysis: parsedTrump.analysis || "ກຳລັງຕິດຕາມຜົນກະທົບຕໍ່ເງິນດອນລ່າ ແລະ ທອງຄຳ",
+            goldEffect: parsedTrump.goldEffect || "Gold Bullish 🚀"
+          };
+        } catch (e) {}
+      }
+    }
+  } catch (err) {}
+
+  // ຖ້າຂ່າວເກີນ 7 ມື້ ຫຼື ບໍ່ມີຂ່າວ Trump ໃໝ່
+  if (!trumpRealData) {
+    trumpRealData = {
+      isExpired: true,
+      post: "ບໍ່ມີຖະແຫຼງການ ຫຼື ຂ່າວ Trump ໃໝ່ພາຍໃນ 7 ມື້ຫຼ້າສຸດ (ລະບົບລຶບຂ່າວເກົ່າອອກອັດຕະໂນມັດແລ້ວ)",
+      source: "Macro Sentinel",
+      time: "ໝົດອາຍຸ (> 7 ມື້)",
+      impactLevel: "ປົກກະຕິ",
+      aiAnalysis: "ບໍ່ມີປັດໄຈກະທົບຈາກ Trump ໃນອາທິດນີ້.",
+      goldEffect: "Neutral ⚖️"
+    };
+  }
+
+  // 2. ດຶງຂ່າວເສດຖະກິດໂລກ (FMP & Google RSS)
   let rawHeadlines = await fetchFMPGeneralNews();
 
   if (rawHeadlines.length === 0) {
@@ -497,12 +555,15 @@ async function getAdvancedGeopoliticalNews() {
       const xml = rssRes.data || "";
       const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
 
-      rawHeadlines = itemMatches.slice(0, 5).map((item, idx) => {
+      rawHeadlines = itemMatches.slice(0, 5).map((item) => {
         const title = (item.match(/<title>(.*?)<\/title>/) || [])[1] || "";
         const pubDate = (item.match(/<pubDate>(.*?)<\/pubDate>/) || [])[1] || "";
         const source = (item.match(/<source[^>]*>(.*?)<\/source>/) || [])[1] || "US Media";
-        const ts = new Date(pubDate).getTime() || (now - idx * 3600000);
-        return { title: title.replace(/&quot;/g, '"').replace(/&amp;/g, '&'), source, timestamp: ts };
+        return {
+          title: title.replace(/&quot;/g, '"').replace(/&amp;/g, '&'),
+          source,
+          timestamp: new Date(pubDate).getTime()
+        };
       }).filter(item => (now - item.timestamp) <= SEVEN_DAYS_MS);
     } catch (e) {}
   }
@@ -540,13 +601,14 @@ async function getAdvancedGeopoliticalNews() {
     } catch (err) {}
   }
 
+  // ຖ້າດຶງບໍ່ໄດ້ ໃຫ້ໃຊ້ຖານຂໍ້ມູນພື້ນຖານ
   if (analyzedNews.length === 0) {
     analyzedNews = [
       {
         id: 1,
         title: "ຄວາມຂັດແຍ່ງຕາເວັນອອກກາງທະວີຄວາມຮຸນແຮງ: ລາຄານ້ຳມັນດິບພຸ່ງກະຕຸ້ນຄວາມຢ້ານກົວເງິນເຟີ້",
-        summary: "ການປະທະກັນໃກ້ບໍລິເວນຂົນສົ່ງນ້ຳມັນ ເຮັດໃຫ້ລາຄານ້ຳມັນດິບໂລກດີດຕົວສູງຂຶ້ນຢ່າງວ່ອງໄວ.",
-        aiGoldAnalysis: "Tri-Brain Consensus: ລາຄານ້ຳມັນແພງຈະດັນໃຫ້ເງິນເຟີ້ພຸ່ງສູງ ເປັນແຮງຂັບເຄື່ອນຫຼັກທີ່ດຶງເງິນເຂົ້າຊື້ຄຳ.",
+        summary: "ການປະທະກັນໃກ້ບໍລິເວນຂົນສົ່ງນ້ຳມັນ ເຮັດໃຫ້ລາຄານ້ຳມັນດິບໂລກດີດຕົວສູງຂຶ້ນ.",
+        aiGoldAnalysis: "Tri-Brain: ລາຄານ້ຳມັນແພງຈະດັນໃຫ້ເງິນເຟີ້ພຸ່ງສູງ ເປັນແຮງຂັບເຄື່ອນຫຼັກທີ່ດຶງເງິນເຂົ້າຊື້ຄຳ.",
         category: "ສົງຄາມ & ນ້ຳມັນ",
         impact: "ຮ້າຍແຮງ (Severe 🚨)",
         goldEffect: "Bullish 🚀",
@@ -557,20 +619,19 @@ async function getAdvancedGeopoliticalNews() {
     ];
   }
 
-  const trumpData = {
-    post: "Trump: 'ພວກເຮົາຈະເພີ່ມກຳແພງພາສີ 25% ຕໍ່ສິນຄ້າທຸກປະເພດ ແລະ ປົກປ້ອງຄ່າເງິນດອນລ່າ!'",
-    source: "Truth Social / Official Statement",
-    time: new Date().toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane', dateStyle: 'medium', timeStyle: 'short' }),
-    impactLevel: "ຮ້າຍແຮງ (Severe 🚨)",
-    aiAnalysis: "ນະໂຍບາຍພາສີການຄ້າ ແລະ ຄວາມສ່ຽງເງິນເຟີ້ ກະຕຸ້ນແຮງຊື້ຄຳໃນຖານະສິນຊັບປອດໄພ.",
-    goldEffect: "Gold Bullish 🚀"
+  cachedMacroNews = {
+    success: true,
+    count: analyzedNews.length,
+    trump: trumpRealData,
+    news: analyzedNews
   };
-
-  cachedMacroNews = { success: true, count: analyzedNews.length, trump: trumpData, news: analyzedNews };
   lastMacroFetchTime = now;
   return cachedMacroNews;
 }
 
+// ============================================================
+// 6. RED NEWS (FOREX FACTORY)
+// ============================================================
 async function getAdvancedRedNewsWithTriBrain(currentPrice) {
   const now = Date.now();
   if (cachedRedNewsData && (now - lastRedNewsFetchTime < 15 * 60 * 1000)) {
@@ -598,7 +659,7 @@ async function getAdvancedRedNewsWithTriBrain(currentPrice) {
     ];
   }
 
-  const list = rawEvents.slice(0, 3).map((raw, idx) => ({
+  const list = rawEvents.slice(0, 4).map((raw, idx) => ({
     id: idx + 1,
     source: "Forex Factory USD Red News",
     time: new Date(raw.date).toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane', weekday: 'short', hour: '2-digit', minute: '2-digit' }),
@@ -614,7 +675,7 @@ async function getAdvancedRedNewsWithTriBrain(currentPrice) {
 }
 
 // ============================================================
-// 6. API ENDPOINTS
+// 7. API ENDPOINTS
 // ============================================================
 app.get('/api/analysis', async (req, res) => {
   try {
@@ -738,5 +799,5 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Gold AI Stable Engine running on port ${PORT}`);
+  console.log(`🚀 Gold AI Stable & Real News Engine running on port ${PORT}`);
 });
