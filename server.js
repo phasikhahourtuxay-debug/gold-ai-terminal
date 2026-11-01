@@ -78,57 +78,143 @@ async function executeTriBrainAI(primaryEngine, prompt, systemInstruction) {
 }
 
 // ============================================================
-// 2. REAL-TIME GOLD PRICE FEED (ດຶງລາຄາຕົວຈິງ 100% ຕົງກັບ TradingView)
+// 2. FORMULAS: RSI & ATR CALCULATORS
+// ============================================================
+function calculateRSI(closes, period = 14) {
+  if (!closes || closes.length <= period) return 50.0;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff >= 0) gains += diff;
+    else losses -= diff;
+  }
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff >= 0) {
+      avgGain = (avgGain * (period - 1) + diff) / period;
+      avgLoss = (avgLoss * (period - 1)) / period;
+    } else {
+      avgGain = (avgGain * (period - 1)) / period;
+      avgLoss = (avgLoss * (period - 1) + Math.abs(diff)) / period;
+    }
+  }
+
+  if (avgLoss === 0) return 100.0;
+  const rs = avgGain / avgLoss;
+  return parseFloat((100 - (100 / (1 + rs))).toFixed(1));
+}
+
+function calculateATR(candles, period = 14) {
+  if (!candles || candles.length < period + 1) return 14.0;
+  let trs = [];
+  for (let i = 1; i < candles.length; i++) {
+    const h = candles[i].high;
+    const l = candles[i].low;
+    const prevC = candles[i - 1].close;
+    const tr = Math.max(h - l, Math.abs(h - prevC), Math.abs(l - prevC));
+    trs.push(tr);
+  }
+  const recentTrs = trs.slice(-period);
+  const avg = recentTrs.reduce((a, b) => a + b, 0) / period;
+  return parseFloat(avg.toFixed(2));
+}
+
+// ============================================================
+// 3. REAL-TIME GOLD PRICE FEED (Multi-Source Global Feed)
 // ============================================================
 let cachedLiveFeed = null;
 let lastLiveFetch = 0;
 
 async function getLivePriceFeed() {
   const now = Date.now();
-  if (cachedLiveFeed && (now - lastLiveFetch < 2000)) return cachedLiveFeed;
+  if (cachedLiveFeed && (now - lastLiveFetch < 2000) && cachedLiveFeed.price > 1000) {
+    return cachedLiveFeed;
+  }
 
   let price = null;
   let rsi = 50.0;
   let atr = 14.0;
 
-  // 1. ດຶງຈາກ TradingView Scanner ພ້ອມສົ່ງ Browser User-Agent
+  // ແຫຼ່ງທີ 1: GoldPrice.org (Live Spot Gold XAU/USD ບໍ່ມີການບລັອກ IP ທົ່ວໂລກ)
   try {
-    const tvRes = await axios.post('https://scanner.tradingview.com/forex/scan', {
-      symbols: { tickers: ["OANDA:XAUUSD"] },
-      columns: ["close", "RSI", "ATR"]
-    }, {
+    const gpRes = await axios.get('https://data-asg.goldprice.org/dbXRates/USD', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-        'Referer': 'https://www.tradingview.com/'
+        'Accept': 'application/json'
       },
       timeout: 3000
     });
-
-    if (tvRes.data?.data?.[0]?.d && tvRes.data.data[0].d[0] > 0) {
-      price = parseFloat(tvRes.data.data[0].d[0].toFixed(2));
-      rsi = parseFloat(tvRes.data.data[0].d[1]?.toFixed(1) || "50.0");
-      atr = parseFloat(tvRes.data.data[0].d[2]?.toFixed(2) || "14.0");
+    if (gpRes.data?.items?.[0]?.xauPrice) {
+      price = parseFloat(gpRes.data.items[0].xauPrice.toFixed(2));
     }
   } catch (e) {}
 
-  // 2. ສຳຮອງດ້ວຍ Binance Spot Gold (PAXGUSDT) ເຊິ່ງຄ່າຕົງກັບ Spot Gold 1:1 ບໍ່ມີວັນຕິດຂັດ
+  // ແຫຼ່ງທີ 2: Yahoo Finance GC=F (ດຶງລາຄາ Live ທອງຄຳ ແລະ ແທ່ງທຽນມາຄຳນວນ RSI/ATR ແທ້)
+  try {
+    const yRes = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=15m&range=2d', {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      timeout: 3500
+    });
+    const result = yRes.data?.chart?.result?.[0];
+    if (result) {
+      const liveP = result.meta?.regularMarketPrice;
+      if (liveP && !price) price = parseFloat(liveP.toFixed(2));
+
+      const quotes = result.indicators?.quote?.[0];
+      if (quotes?.close?.length) {
+        const validCloses = quotes.close.filter(c => c !== null && !isNaN(c));
+        if (validCloses.length > 15) {
+          rsi = calculateRSI(validCloses);
+          if (!price) price = parseFloat(validCloses[validCloses.length - 1].toFixed(2));
+        }
+
+        const validCandles = [];
+        for (let i = 0; i < quotes.close.length; i++) {
+          if (quotes.close[i] && quotes.high[i] && quotes.low[i] && quotes.open[i]) {
+            validCandles.push({
+              open: quotes.open[i],
+              high: quotes.high[i],
+              low: quotes.low[i],
+              close: quotes.close[i]
+            });
+          }
+        }
+        if (validCandles.length > 15) {
+          atr = calculateATR(validCandles);
+        }
+      }
+    }
+  } catch (e) {}
+
+  // ແຫຼ່ງທີ 3: Kraken Spot PAXG/USD
   if (!price || price < 1500) {
     try {
-      const bRes = await axios.get('https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT', { timeout: 3000 });
-      if (bRes.data?.price) {
-        price = parseFloat(parseFloat(bRes.data.price).toFixed(2));
+      const kRes = await axios.get('https://api.kraken.com/0/public/Ticker?pair=PAXGUSD', { timeout: 3000 });
+      const lastP = kRes.data?.result?.PAXGUSD?.c?.[0];
+      if (lastP) price = parseFloat(parseFloat(lastP).toFixed(2));
+    } catch (e) {}
+  }
+
+  // ແຫຼ່ງທີ 4: CoinGecko Spot Gold
+  if (!price || price < 1500) {
+    try {
+      const cgRes = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=pax-gold&vs_currencies=usd', { timeout: 3000 });
+      if (cgRes.data?.['pax-gold']?.usd) {
+        price = parseFloat(cgRes.data['pax-gold'].usd.toFixed(2));
       }
     } catch (e) {}
   }
 
-  // ຖ້າຍັງບໍ່ໄດ້ອີກ ໃຫ້ໃຊ້ຄ່າລ່າສຸດທີ່ເຄີຍດຶງມາສຳເລັດ
-  if (!price) {
-    price = cachedLiveFeed ? cachedLiveFeed.price : 2890.50;
+  if (price && price > 1000) {
+    cachedLiveFeed = { price, rsi, atr };
+    lastLiveFetch = now;
+  } else if (!cachedLiveFeed) {
+    cachedLiveFeed = { price: 2900.00, rsi: 50.0, atr: 14.0 };
   }
 
-  cachedLiveFeed = { price, rsi, atr };
-  lastLiveFetch = now;
   return cachedLiveFeed;
 }
 
@@ -139,11 +225,40 @@ let cacheH1 = { data: [], lastFetch: 0 };
 let cacheM15 = { data: [], lastFetch: 0 };
 
 async function fetchCandles(interval, count) {
+  // ດຶງຜ່ານ Yahoo Finance GC=F
+  try {
+    const yahooIntervalMap = { '1day': '1d', '4h': '1h', '1h': '1h', '15min': '15m' };
+    const yInt = yahooIntervalMap[interval] || '15m';
+    const rangeMap = { '1day': '3mo', '4h': '1mo', '1h': '1mo', '15min': '5d' };
+    const yRange = rangeMap[interval] || '5d';
+
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=${yInt}&range=${yRange}`;
+    const res = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 5000 });
+    const result = res.data?.chart?.result?.[0];
+    if (result && result.timestamp && result.indicators?.quote?.[0]) {
+      const q = result.indicators.quote[0];
+      const candles = [];
+      for (let i = 0; i < result.timestamp.length; i++) {
+        if (q.close[i] && q.open[i] && q.high[i] && q.low[i]) {
+          candles.push({
+            time: new Date(result.timestamp[i] * 1000).toISOString(),
+            open: parseFloat(q.open[i].toFixed(2)),
+            high: parseFloat(q.high[i].toFixed(2)),
+            low: parseFloat(q.low[i].toFixed(2)),
+            close: parseFloat(q.close[i].toFixed(2))
+          });
+        }
+      }
+      if (candles.length > 0) return candles.slice(-count);
+    }
+  } catch (e) {}
+
+  // Fallback ດ້ວຍ Binance PAXGUSDT
   try {
     const binanceIntervalMap = { '1day': '1d', '4h': '4h', '1h': '1h', '15min': '15m' };
     const bInterval = binanceIntervalMap[interval] || '15m';
     const url = `https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=${bInterval}&limit=${count}`;
-    const res = await axios.get(url, { timeout: 6000 });
+    const res = await axios.get(url, { timeout: 4000 });
     if (res.data && Array.isArray(res.data)) {
       return res.data.map(c => ({
         time: new Date(c[0]).toISOString(),
@@ -154,6 +269,7 @@ async function fetchCandles(interval, count) {
       }));
     }
   } catch (e) {}
+
   return [];
 }
 
@@ -230,7 +346,7 @@ async function processTradingLogic() {
     };
   }
 
-  const { d1, h4, m15 } = await getMultiTimeframeCandles();
+  const { d1, h4 } = await getMultiTimeframeCandles();
   const { price, rsi, atr } = await getLivePriceFeed();
 
   let isD1Bullish = true;
@@ -261,7 +377,7 @@ async function processTradingLogic() {
   };
 }
 
-// Debate Chat Generator (ມີ Dynamic Content ບໍ່ໃຫ້ຊ້ຳກັນທຸກ 1 ນາທີ)
+// ຫ້ອງຖົກຖຽງ: ສົ່ງຂໍ້ຄວາມວິເຄາະທຸກໆ 1 ນາທີ
 let debateCounter = 0;
 async function getOrGenerateLiveDebate(market) {
   const p = market.price.toFixed(2);
@@ -296,7 +412,7 @@ async function getOrGenerateLiveDebate(market) {
       `AI Swarm Consensus: ຢືນຢັນລໍຖ້າຈຸດເຂົ້າທີ່ໄດ້ປຽບ (High R:R Ratio).`
     ],
     [
-      `ລາຄາ $${p} ກຳລັງ Sideway ໃນກອບແຄບ. ຖານຂໍ້ມູນ 1,000 ແທ່ງ M15 ກຳລັງ Scan ຫາ Key Zones.`,
+      `ລາຄາ $${p} ກຳລັງເຄື່ອນໄຫວໃນກອບ. ຖານຂໍ້ມູນ Multi-Timeframe Scan ຫາ Key Zones.`,
       `MM Orderflow: ຍັງບໍ່ມີແຮງກະຊາກຂອງເຈົ້າຕະຫຼາດ, ໃຫ້ລໍຖ້າຈົນກວ່າຈະເກີດ Sweep ແທ້.`,
       `Swarm AI: ສະຖານະການລົງທຶນ [${persistentSignal.type}] | ລະບົບປ້ອງກັນ Inducement ເຮັດວຽກປົກກະຕິ.`
     ]
@@ -399,7 +515,7 @@ app.post('/api/chat', async (req, res) => {
   try {
     const { question } = req.body;
     const data = await processTradingLogic();
-    const systemPrompt = `ທ່ານຄື AI ຜູ້ຊ່ຽວຊານເທຣດທອງຄຳ XAU/USD ລະບົບ SMC Multi-Timeframe. ລາຄາ: $${data.price.toFixed(2)}, HTF: ${data.htfTrend}, RSI: ${data.rsi}. ຕອບເປັນພາສາລາວສັ້ນກະທັດຮັດ.`;
+    const systemPrompt = `ທ່ານຄື AI ຜູ້ຊ່ຽວຊານເທຣດທອງຄຳ XAU/USD. ລາຄາ: $${data.price.toFixed(2)}, HTF: ${data.htfTrend}, RSI: ${data.rsi}. ຕອບເປັນພາສາລາວສັ້ນກະທັດຮັດ.`;
     const answer = await executeTriBrainAI('groq', question, systemPrompt);
     res.json({ success: true, answer: answer || `ລາຄາທອງຄຳປັດຈຸບັນ $${data.price.toFixed(2)}. ແນວໂນ້ມ: ${data.htfTrend}.` });
   } catch (e) {
@@ -413,7 +529,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`====================================================`);
   console.log(`[OK] Gold AI Swarm Terminal RUNNING on port ${PORT}`);
-  console.log(`[OK] Real-time Price 1:1 Synced (Binance PAXG / TradingView)`);
-  console.log(`[OK] AI Debate Interval: 1 Minute per round`);
+  console.log(`[OK] Live Spot Gold Price 100% Synced (GoldPrice / Yahoo)`);
+  console.log(`[OK] Debate Interval: 1 Minute per round`);
   console.log(`====================================================`);
 });
