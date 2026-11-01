@@ -1,16 +1,24 @@
 {
-  "name": "gold-ai-swarm-terminal",
-  "version": "1.0.0",
-  "description": "Gold XAU/USD AI Liquidity Hunter Terminal",
+  "name": "gold-ai-terminal",
+  "version": "2.0.0",
+  "description": "Gold AI 1,000-Candle SMC Terminal (Fixed 8 Issues)",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
-    "axios": "^1.6.8",
+    "axios": "^1.7.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "openai": "^4.33.0"
+    "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
+    "openai": "^4.73.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
