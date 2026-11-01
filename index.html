@@ -176,7 +176,7 @@
                 </div>
             </div>
 
-            <!-- Dynamic Signal Card: TP1-TP5 ແລະ SL -->
+            <!-- Dynamic Signal Card -->
             <div id="signal-card" class="bg-gray-900 border-2 border-yellow-500/40 p-5 rounded-2xl glow-gold transition-all duration-300">
                 <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                     <div class="flex items-center gap-2">
@@ -222,7 +222,7 @@
                     </div>
                 </div>
                 <form id="chat-form" class="mt-3 flex gap-2" onsubmit="handleUserChatSubmit(event)">
-                    <input type="text" id="chat-input" placeholder="ພິມຖາມ AI (ຕົວຢ່າງ: ຕອນນີ້ຄວນ Buy ຫຼື Sell ຕາມ 4 SMC Setups?)..." 
+                    <input type="text" id="chat-input" placeholder="ພິມຖາມ AI (ຕົວຢ່າງ: ຕອນນີ້ຄວນ Buy ຫຼື Sell?)..." 
                            class="flex-grow bg-gray-800 border border-gray-700 rounded-xl px-3.5 py-3 text-xs text-white focus:outline-none focus:border-yellow-500" required>
                     <button type="submit" id="chat-submit-btn" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-4 py-3 rounded-xl text-xs transition">
                         <i class="fa-solid fa-paper-plane"></i>
@@ -264,9 +264,7 @@
                             ພາບປະກອບຈຳລອງ: SMC Liquidity Sweep & Inducement Filter
                         </h3>
                     </div>
-                    <span class="text-xs bg-purple-950 text-purple-300 border border-purple-700/50 px-2.5 py-0.5 rounded-full font-mono">
-                        TimeFrame M15
-                    </span>
+                    <span class="text-xs bg-purple-950 text-purple-300 border border-purple-700/50 px-2.5 py-0.5 rounded-full font-mono">TimeFrame M15</span>
                 </div>
                 <div class="w-full bg-slate-950 rounded-xl p-3 border border-gray-800 flex flex-col items-center justify-center relative">
                     <canvas id="liquidityCanvas" width="620" height="340" class="w-full h-auto max-h-[340px] rounded-lg"></canvas>
@@ -316,11 +314,11 @@
                     <h2 class="text-sm md:text-base font-bold text-white flex items-center gap-2">
                         #xauusd_ai_swarm_debate <span class="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-wider animate-pulse">LIVE</span>
                     </h2>
-                    <p class="text-xs text-gray-400">Stream ການວິເຄາະສົດ Real-Time ໂດຍ 3 AI ຜູ້ຊ່ຽວຊານ</p>
+                    <p class="text-xs text-gray-400">Stream ການວິເຄາະສົດ Real-Time ໂດຍ 3 AI ຜູ້ຊ່ຽວຊານ (1 ນາທີຕໍ່ 1 ຮອບ)</p>
                 </div>
             </div>
             <div class="flex items-center gap-3 mt-2 sm:mt-0">
-                <span class="text-xs bg-[#0e0e10] border border-gray-700 text-yellow-400 px-3 py-1.5 rounded-lg font-mono" id="debate-chart-status">
+                <span class="text-xs bg-[#0e0e10] border border-gray-700 text-yellow-400 px-3 py-1.5 rounded-lg font-mono font-bold" id="debate-chart-status">
                     Tracking OANDA:XAUUSD Live...
                 </span>
             </div>
@@ -330,19 +328,19 @@
             <div class="lg:col-span-8 bg-[#0e0e10] border border-gray-800 rounded-xl flex flex-col h-[600px] shadow-2xl overflow-hidden">
                 <div class="bg-[#18181b] border-b border-gray-800 px-4 py-2 flex justify-between items-center text-xs text-gray-400 font-mono">
                     <span class="flex items-center gap-2 text-gray-300 font-bold">
-                        <i class="fa-solid fa-comments text-purple-400"></i> STREAM CHAT
+                        <i class="fa-solid fa-comments text-purple-400"></i> STREAM CHAT (AUTO DEBATE 1-MIN INTERVAL)
                     </span>
                     <span class="text-[11px] text-emerald-400">● Connected to AI Swarm Voice</span>
                 </div>
 
                 <div id="twitch-chat-stream" class="flex-1 overflow-y-auto custom-scroll p-3 space-y-1.5 text-xs font-mono leading-relaxed bg-[#0b0e14]">
                     <div class="text-gray-500 text-[11px] py-1 border-b border-gray-800/60 mb-2">
-                        [System]: ຍິນດີຕ້ອນຮັບສູ່ຫ້ອງ AI Live Debate. ລະບົບ Multi-Timeframe SMC Active...
+                        [System]: ຍິນດີຕ້ອນຮັບສູ່ຫ້ອງ AI Live Debate. ລະບົບຈະສົນທະນາວິເຄາະທຸກໆ 1 ນາທີ...
                     </div>
                 </div>
 
                 <div class="bg-[#18181b] border-t border-gray-800 p-2.5 flex items-center justify-between text-xs text-gray-400">
-                    <span class="text-[11px] text-green-400">● Chat Feed: Real-time Auto Streaming</span>
+                    <span class="text-[11px] text-green-400">● Chat Feed: Auto-Posting every 1 minute</span>
                     <button onclick="clearChatStream()" class="text-[11px] text-gray-400 hover:text-red-400 transition underline">ລຶບປະຫວັດແຊັດ</button>
                 </div>
             </div>
@@ -396,7 +394,6 @@
             </button>
         </div>
 
-        <!-- Pinned Trump Card -->
         <div class="bg-gradient-to-r from-gray-900 via-gray-900 to-amber-950/40 border-2 border-amber-500/70 p-5 rounded-2xl glow-gold space-y-3">
             <div class="flex flex-wrap justify-between items-center border-b border-gray-800 pb-2.5">
                 <div class="flex items-center gap-2">
@@ -437,7 +434,7 @@
         let customAudioUrl = "/alert.mp3";
         let isSoundPlaying = false;
         let soundTimerInterval = null;
-        let soundTimeRemaining = 300; // 5 ນາທີ (300 ວິນາທີ)
+        let soundTimeRemaining = 300;
         let lastPlayedSignalId = null;
 
         function unlockAudioOnce() {
@@ -534,7 +531,6 @@
             } else if (tab === 'debate') {
                 btnDebate.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-cyan-600 text-white shadow-md glow-blue";
                 viewDebate.classList.remove('hidden');
-                fetchAutoBotDebate();
             } else if (tab === 'geo') {
                 btnGeo.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-amber-600 text-white shadow-md glow-amber";
                 viewGeo.classList.remove('hidden');
@@ -713,7 +709,7 @@
             });
         }
 
-        // Live Debate
+        // Live Debate (ແກ້ໄຂໃຫ້ດຶງລາຄາ Live ແລະ Stream ທຸກໆ 1 ນາທີ)
         async function fetchAutoBotDebate() {
             try {
                 const res = await fetch(`${API_BASE}/swarm-live-debate`);
@@ -733,7 +729,7 @@
                         line.innerHTML = `<span class="text-gray-500 text-[11px]">[${m.time}]</span><div>${badgeHtml}<span class="font-bold ${m.color}">${m.agent}</span>: <span class="text-gray-200">${m.message}</span></div>`;
                         chatStream.appendChild(line);
                         chatStream.scrollTop = chatStream.scrollHeight;
-                    }, idx * 1500);
+                    }, idx * 1200);
                 });
             } catch (e) {}
         }
@@ -791,7 +787,7 @@
             } catch (err) {}
         }
 
-        // Chat
+        // Chat Form Submit
         async function handleUserChatSubmit(e) {
             e.preventDefault();
             const input = document.getElementById('chat-input');
@@ -813,17 +809,19 @@
             qaBox.scrollTop = qaBox.scrollHeight;
         }
 
-        // Loops
+        // ==========================================
+        // MAIN RUNTIME LOOPS
+        // ==========================================
         fetchAnalysis();
         fetchGeopolitics();
         fetchRedNews();
         fetchLiquidityAnalysis();
-        fetchAutoBotDebate();
+        fetchAutoBotDebate(); // ຮອບທຳອິດເມື່ອເປີດໜ້າເວັບ
 
-        setInterval(fetchAnalysis, 4500);
-        setInterval(fetchLiquidityAnalysis, 6000);
-        setInterval(fetchAutoBotDebate, 14000);
-        setInterval(fetchGeopolitics, 60000);
+        setInterval(fetchAnalysis, 4000);              // ອັບເດດລາຄາທຸກໆ 4 ວິນາທີ
+        setInterval(fetchLiquidityAnalysis, 6000);     // ອັບເດດ Liquidity ທຸກໆ 6 ວິນາທີ
+        setInterval(fetchAutoBotDebate, 60000);        // 🔥 ຕັ້ງເປັນ 60,000ms = 1 ນາທີຕໍ່ 1 ຄັ້ງຕາມທີ່ຂໍ
+        setInterval(fetchGeopolitics, 60000);          // ອັບເດດຂ່າວໂລກທຸກໆ 1 ນາທີ
     </script>
 </body>
 </html>
