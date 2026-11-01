@@ -3,12 +3,13 @@ const cors = require('cors');
 const axios = require('axios');
 const dotenv = require('dotenv');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const { OpenAI } = require('openai');
 
 dotenv.config();
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10kb' }));
 app.use(express.static(path.join(__dirname)));
 
 // ============================================================
@@ -17,11 +18,33 @@ app.use(express.static(path.join(__dirname)));
 const TWELVE_DATA_KEY = process.env.TWELVE_DATA_API_KEY || "";
 const FMP_KEY = process.env.FMP_API_KEY || "";
 
-// ============================================================
-// 1. TRI-BRAIN AI CLIENTS (Groq + Gemini + OpenRouter/DeepSeek)
-// ============================================================
+// ✅ ຂໍ້ 3: ປ້ອງກັນ API Key ຫຼຸດລອດ
+function safeLog(msg, err) {
+  const cleanMsg = String(msg).replace(/apikey=[^&\s]+/gi, 'apikey=***').replace(/key=[^&\s]+/gi, 'key=***');
+  const cleanErr = err ? String(err.message || err).replace(/apikey=[^&\s]+/gi, 'apikey=***') : '';
+  console.warn(`⚠️ ${cleanMsg}${cleanErr ? ' | ' + cleanErr : ''}`);
+}
 
-// 1.1 GROQ (Ultra-Fast Debate Engine)
+// ✅ ຂໍ້ 4: Rate Limiting
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false,
+  message: { success: false, error: "ຖາມເລື້ອຍເກີນໄປ, ກະລຸນາລໍຖ້າ 1 ນາທີ" }
+});
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false
+});
+
+// ✅ ຂໍ້ 6: Timeout wrapper
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms))
+  ]);
+}
+
+// ============================================================
+// 1. TRI-BRAIN AI CLIENTS
+// ============================================================
 const groqClient = new OpenAI({
   apiKey: process.env.GROQ_API_KEY || "dummy_key",
   baseURL: "https://api.groq.com/openai/v1"
@@ -36,25 +59,20 @@ async function callGroqAI(prompt, systemInstruction = "") {
       { role: "system", content: systemInstruction || "You are a professional financial AI." },
       { role: "user", content: prompt }
     ],
-    max_tokens: 550,
-    temperature: 0.5
+    max_tokens: 650, temperature: 0.5
   });
   return completion.choices[0].message.content.trim();
 }
 
-// 1.2 GEMINI (Lao Linguist & Macro Analyst)
 const GEMINI_MODELS = ["gemma-4-26b-a4b-it", "gemini-flash-latest", "gemini-3.5-flash-lite"];
 async function callGeminiAI(prompt, systemInstruction = "") {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("No Gemini Key");
-
   for (const model of GEMINI_MODELS) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
-      if (systemInstruction) {
-        payload.system_instruction = { parts: [{ text: systemInstruction }] };
-      }
+      if (systemInstruction) payload.system_instruction = { parts: [{ text: systemInstruction }] };
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -69,11 +87,9 @@ async function callGeminiAI(prompt, systemInstruction = "") {
   throw new Error("Gemini models busy");
 }
 
-// 1.3 OPENROUTER (DeepSeek SMC Quant Logic Engine)
 async function callOpenRouterAI(prompt, systemInstruction = "") {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("No OpenRouter Key");
-
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -88,8 +104,7 @@ async function callOpenRouterAI(prompt, systemInstruction = "") {
         { role: "system", content: systemInstruction || "You are an expert SMC quant trader." },
         { role: "user", content: prompt }
       ],
-      max_tokens: 650,
-      temperature: 0.4
+      max_tokens: 650, temperature: 0.4
     })
   });
   const data = await res.json();
@@ -99,24 +114,23 @@ async function callOpenRouterAI(prompt, systemInstruction = "") {
   throw new Error(data.error?.message || "OpenRouter Error");
 }
 
-// 1.4 SMART ORCHESTRATOR
 async function executeTriBrainAI(primaryEngine, prompt, systemInstruction) {
   const engines = [];
-  if (primaryEngine === 'openrouter') engines.push(callOpenRouterAI, callGeminiAI, callGroqAI);
-  else if (primaryEngine === 'gemini') engines.push(callGeminiAI, callOpenRouterAI, callGroqAI);
-  else engines.push(callGroqAI, callOpenRouterAI, callGeminiAI);
+  if (primaryEngine === 'openrouter') engines.push(['openrouter', callOpenRouterAI], ['gemini', callGeminiAI], ['groq', callGroqAI]);
+  else if (primaryEngine === 'gemini') engines.push(['gemini', callGeminiAI], ['openrouter', callOpenRouterAI], ['groq', callGroqAI]);
+  else engines.push(['groq', callGroqAI], ['openrouter', callOpenRouterAI], ['gemini', callGeminiAI]);
 
-  for (const engine of engines) {
+  for (const [name, engine] of engines) {
     try {
-      const response = await engine(prompt, systemInstruction);
+      const response = await withTimeout(engine(prompt, systemInstruction), 12000, name);
       if (response && response.length > 5) return response;
-    } catch (err) {}
+    } catch (err) { safeLog(`AI engine ${name} failed`, err); }
   }
   throw new Error("All Tri-Brain engines busy");
 }
 
 // ============================================================
-// 2. DATA LAYER (BINANCE PAXG + TWELVE DATA CROSS-CHECK)
+// 2. DATA LAYER (STATE)
 // ============================================================
 let cachedCandles1000 = [];
 let lastCandlesFetchTime = 0;
@@ -126,26 +140,21 @@ let cachedMacroNews = null;
 let lastMacroFetchTime = 0;
 let cachedRedNewsData = null;
 let lastRedNewsFetchTime = 0;
-let lastCommitteeTime = 0;
+let isMockData = false;
+
+// ✅ ຂໍ້ 1: Signal TTL
+const SIGNAL_TTL = 15 * 60 * 1000;
+const SIGNAL_COOLDOWN = 5 * 60 * 1000;
 
 let persistentSignal = {
-  type: "WAIT",
-  isAutoTriggered: false,
-  entry: "--",
-  tp1: "--",
-  tp2: "--",
-  tp3: "--",
-  tp4: "--",
-  sl: "--",
-  rrRatio: "1 : 3.8",
+  type: "WAIT", isAutoTriggered: false,
+  entry: "--", tp1: "--", tp2: "--", tp3: "--", tp4: "--", sl: "--", rrRatio: "--",
   setupName: "SMC 1,000-Candle Engine ກຳລັງສະແກນ...",
   setupDescription: "AI ກຳລັງວິເຄາະ BSL/SSL ຈາກ 1,000 ແທ່ງ M15 ຕົວຈິງ...",
   votes: { deepseek: "WAIT", gemini: "WAIT", groq: "WAIT" },
-  confidence: "85%",
-  timestamp: Date.now()
+  confidence: "85%", timestamp: Date.now(), lastResetTime: Date.now()
 };
 
-// ດຶງ 1,000 ແທ່ງ M15 ຈາກ Binance PAXG (Free Public API, ບໍ່ຕ້ອງໃຊ້ Key, ໄວທີ່ສຸດ)
 async function fetchBinancePAXGCandles() {
   try {
     const url = "https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=1000";
@@ -153,20 +162,14 @@ async function fetchBinancePAXGCandles() {
     if (Array.isArray(res.data) && res.data.length > 50) {
       return res.data.map(c => ({
         datetime: new Date(c[0]).toISOString(),
-        open: parseFloat(c[1]),
-        high: parseFloat(c[2]),
-        low: parseFloat(c[3]),
-        close: parseFloat(c[4]),
-        volume: parseFloat(c[5])
+        open: parseFloat(c[1]), high: parseFloat(c[2]),
+        low: parseFloat(c[3]), close: parseFloat(c[4]), volume: parseFloat(c[5])
       }));
     }
-  } catch (e) {
-    console.warn("⚠️ Binance PAXG API busy:", e.message);
-  }
+  } catch (e) { safeLog("Binance PAXG API busy", e); }
   return null;
 }
 
-// ດຶງ 1,000 ແທ່ງ M15 ຈາກ Twelve Data (ສຳຮອງ / Cross-Check)
 async function fetchTwelveDataCandles() {
   if (!TWELVE_DATA_KEY) return null;
   try {
@@ -175,55 +178,39 @@ async function fetchTwelveDataCandles() {
     if (res.data?.values && Array.isArray(res.data.values) && res.data.values.length > 50) {
       return res.data.values.map(c => ({
         datetime: c.datetime,
-        open: parseFloat(c.open),
-        high: parseFloat(c.high),
-        low: parseFloat(c.low),
-        close: parseFloat(c.close),
+        open: parseFloat(c.open), high: parseFloat(c.high),
+        low: parseFloat(c.low), close: parseFloat(c.close),
         volume: parseFloat(c.volume) || 100
       })).reverse();
     }
-  } catch (e) {
-    console.warn("⚠️ Twelve Data API busy / rate limit reached.");
-  }
+  } catch (e) { safeLog("Twelve Data API busy", e); }
   return null;
 }
 
-// ຟັງຊັນສັງລວມດຶງ 1,000 ແທ່ງ M15 ພ້ອມລະບົບປ້ອງກັນດັບ 100%
 async function get1000M15Candles() {
   const now = Date.now();
-  // Cache 60 ວິນາທີ
-  if (cachedCandles1000.length > 0 && (now - lastCandlesFetchTime < 60000)) {
-    return cachedCandles1000;
-  }
+  if (cachedCandles1000.length > 0 && (now - lastCandlesFetchTime < 60000)) return cachedCandles1000;
 
-  // 1. ດຶງຈາກ Binance PAXG ເປັນຫຼັກ (ໄວສຸດ, ບໍ່ຕິດ Limit)
   const binanceData = await fetchBinancePAXGCandles();
   if (binanceData && binanceData.length > 50) {
-    cachedCandles1000 = binanceData;
-    lastCandlesFetchTime = now;
+    cachedCandles1000 = binanceData; lastCandlesFetchTime = now;
     lastKnownRealPrice = binanceData[binanceData.length - 1].close;
-    activeSourceLabel = "Binance PAXG (1:1 LBMA Gold)";
+    activeSourceLabel = "Binance PAXG (1:1 LBMA Gold)"; isMockData = false;
     console.log(`✅ [Binance PAXG] ດຶງ 1,000 ແທ່ງ M15 ສຳເລັດ! ລາຄາ: $${lastKnownRealPrice}`);
     return cachedCandles1000;
   }
 
-  // 2. ຖ້າ Binance ມີບັນຫາ ➔ ສະຫຼັບໄປ Twelve Data
   const tdData = await fetchTwelveDataCandles();
   if (tdData && tdData.length > 50) {
-    cachedCandles1000 = tdData;
-    lastCandlesFetchTime = now;
+    cachedCandles1000 = tdData; lastCandlesFetchTime = now;
     lastKnownRealPrice = tdData[tdData.length - 1].close;
-    activeSourceLabel = "Twelve Data XAU/USD";
+    activeSourceLabel = "Twelve Data XAU/USD"; isMockData = false;
     console.log(`✅ [Twelve Data Backup] ດຶງ 1,000 ແທ່ງ M15 ສຳເລັດ! ລາຄາ: $${lastKnownRealPrice}`);
     return cachedCandles1000;
   }
 
-  // 3. ຖ້າຫຼຸດທັງສອງ ➔ ໃຊ້ Cache ໃນ RAM
-  if (cachedCandles1000.length > 0) {
-    return cachedCandles1000;
-  }
+  if (cachedCandles1000.length > 0) return cachedCandles1000;
 
-  // 4. ສ້າງແທ່ງທຽນຕໍ່ເນື່ອງຈາກລາຄາແທ້ລ່າສຸດ
   const mockCandles = [];
   let p = lastKnownRealPrice;
   for (let i = 0; i < 1000; i++) {
@@ -235,43 +222,52 @@ async function get1000M15Candles() {
     p = c;
     mockCandles.push({
       datetime: new Date(now - (1000 - i) * 15 * 60 * 1000).toISOString(),
-      open: parseFloat(o.toFixed(2)),
-      high: parseFloat(h.toFixed(2)),
-      low: parseFloat(l.toFixed(2)),
-      close: parseFloat(c.toFixed(2)),
+      open: parseFloat(o.toFixed(2)), high: parseFloat(h.toFixed(2)),
+      low: parseFloat(l.toFixed(2)), close: parseFloat(c.toFixed(2)),
       volume: Math.floor(Math.random() * 1500) + 500
     });
   }
-  cachedCandles1000 = mockCandles;
-  lastCandlesFetchTime = now;
+  cachedCandles1000 = mockCandles; lastCandlesFetchTime = now;
+  activeSourceLabel = "MOCK DATA (API ລົ້ມ)"; isMockData = true;
+  safeLog("⚠️ ທັງ Binance ແລະ Twelve Data ລົ້ມ — ໃຊ້ mock data");
   return cachedCandles1000;
 }
 
+// ===== ສືບຕໍ່ໃນຂໍ້ຄວາມທີ 2/4 =====
 // ============================================================
-// 3. SMC QUANTITATIVE ALGORITHM ON 1,000 CANDLES
+// 3. SMC ALGORITHM (✅ ຂໍ້ 1 + ຂໍ້ 7)
 // ============================================================
 function runAlgorithmicSMCOn1000Candles(candles) {
   const total = candles.length;
   const currentCandle = candles[total - 1];
   const prevCandle = candles[total - 2];
   const p = currentCandle.close;
+  const now = Date.now();
 
-  // 1. ຊອກຫາ Swing Highs (BSL) & Swing Lows (SSL)
-  const swingHighs = [];
-  const swingLows = [];
-
-  for (let i = 5; i < total - 5; i++) {
-    const bar = candles[i];
-    const isHigh = candles.slice(i - 4, i).every(c => c.high <= bar.high) &&
-                   candles.slice(i + 1, i + 5).every(c => c.high <= bar.high);
-    if (isHigh) swingHighs.push({ price: bar.high, index: i, time: bar.datetime });
-
-    const isLow = candles.slice(i - 4, i).every(c => c.low >= bar.low) &&
-                  candles.slice(i + 1, i + 5).every(c => c.low >= bar.low);
-    if (isLow) swingLows.push({ price: bar.low, index: i, time: bar.datetime });
+  // ✅ ຂໍ້ 1: Reset signal ຖ້າໝົດອາຍຸ
+  if (persistentSignal.isAutoTriggered && (now - persistentSignal.timestamp) > SIGNAL_TTL) {
+    console.log(`🔄 Signal ໝົດອາຍຸ → reset ເປັນ WAIT`);
+    persistentSignal = {
+      type: "WAIT", isAutoTriggered: false,
+      entry: "--", tp1: "--", tp2: "--", tp3: "--", tp4: "--", sl: "--", rrRatio: "--",
+      setupName: "SMC 1,000-Candle Engine ກຳລັງສະແກນ...",
+      setupDescription: "ສັນຍານເກົ່າໝົດອາຍຸແລ້ວ — ກຳລັງສະແກນໃໝ່...",
+      votes: { deepseek: "WAIT", gemini: "WAIT", groq: "WAIT" },
+      confidence: "85%", timestamp: now, lastResetTime: now
+    };
   }
 
-  // 2. ຄັດເລືອກ Key Levels (R1, R2, S1, S2)
+  const swingHighs = [], swingLows = [];
+  for (let i = 5; i < total - 5; i++) {
+    const bar = candles[i];
+    if (candles.slice(i - 4, i).every(c => c.high <= bar.high) &&
+        candles.slice(i + 1, i + 5).every(c => c.high <= bar.high))
+      swingHighs.push({ price: bar.high, index: i, time: bar.datetime });
+    if (candles.slice(i - 4, i).every(c => c.low >= bar.low) &&
+        candles.slice(i + 1, i + 5).every(c => c.low >= bar.low))
+      swingLows.push({ price: bar.low, index: i, time: bar.datetime });
+  }
+
   const higherSwings = swingHighs.filter(s => s.price > p).sort((a, b) => a.price - b.price);
   const lowerSwings = swingLows.filter(s => s.price < p).sort((a, b) => b.price - a.price);
 
@@ -280,7 +276,6 @@ function runAlgorithmicSMCOn1000Candles(candles) {
   const s1 = lowerSwings[0]?.price || parseFloat((p - 12.5).toFixed(2));
   const s2 = lowerSwings[1]?.price || parseFloat((p - 25.0).toFixed(2));
 
-  // 3. Volume Spike Check
   const last20Volumes = candles.slice(-21, -1).map(c => c.volume);
   const avgVolume20 = last20Volumes.reduce((a, b) => a + b, 0) / 20;
   const isVolumeSpike = currentCandle.volume > (avgVolume20 * 1.8) || prevCandle.volume > (avgVolume20 * 1.8);
@@ -288,29 +283,16 @@ function runAlgorithmicSMCOn1000Candles(candles) {
     ? `$1.8B - $2.4B USD (🔥 High Institutional Volume)` 
     : `$850M - $1.2B USD (Normal Market Flow)`;
 
-  // 4. Real Liquidity Sweep (Wick Rejection ຈາກແທ່ງລ່າສຸດ)
   const recent3 = candles.slice(-3);
-  let sweepDetected = false;
-  let sweepType = null;
-  let sweepCandle = null;
-
+  let sweepDetected = false, sweepType = null, sweepCandle = null;
   for (const c of recent3) {
-    if (c.low < s1 && c.close > s1) {
-      sweepDetected = true;
-      sweepType = "BUY";
-      sweepCandle = c;
-      break;
-    }
-    if (c.high > r1 && c.close < r1) {
-      sweepDetected = true;
-      sweepType = "SELL";
-      sweepCandle = c;
-      break;
-    }
+    if (c.low < s1 && c.close > s1) { sweepDetected = true; sweepType = "BUY"; sweepCandle = c; break; }
+    if (c.high > r1 && c.close < r1) { sweepDetected = true; sweepType = "SELL"; sweepCandle = c; break; }
   }
 
-  // 5. ແຈ້ງເຕືອນສັນຍານ
-  if (sweepDetected && !persistentSignal.isAutoTriggered) {
+  const canTrigger = !persistentSignal.isAutoTriggered || (now - persistentSignal.timestamp) > SIGNAL_COOLDOWN;
+
+  if (sweepDetected && canTrigger) {
     const isBuy = sweepType === "BUY";
     const sl = isBuy ? parseFloat((s1 - 8.0).toFixed(2)) : parseFloat((r1 + 8.0).toFixed(2));
     const tp1 = isBuy ? parseFloat((p + 10.0).toFixed(2)) : parseFloat((p - 10.0).toFixed(2));
@@ -318,128 +300,102 @@ function runAlgorithmicSMCOn1000Candles(candles) {
     const tp3 = isBuy ? parseFloat((p + 35.0).toFixed(2)) : parseFloat((p - 35.0).toFixed(2));
     const tp4 = isBuy ? parseFloat((p + 50.0).toFixed(2)) : parseFloat((p - 50.0).toFixed(2));
 
+    // ✅ ຂໍ້ 7: R:R ຄຳນວນຕົວຈິງ
+    const risk = Math.abs(p - sl);
+    const reward = Math.abs(tp3 - p);
+    const rrRatio = risk > 0 ? `1 : ${(reward / risk).toFixed(2)}` : "1 : ?";
+
     persistentSignal = {
-      type: sweepType,
-      isAutoTriggered: true,
-      entry: `$${p.toFixed(2)}`,
-      tp1: `$${tp1}`,
-      tp2: `$${tp2}`,
-      tp3: `$${tp3}`,
-      tp4: `$${tp4}`,
-      sl: `$${sl}`,
-      rrRatio: "1 : 3.8",
+      type: sweepType, isAutoTriggered: true,
+      entry: `$${p.toFixed(2)}`, tp1: `$${tp1}`, tp2: `$${tp2}`, tp3: `$${tp3}`, tp4: `$${tp4}`,
+      sl: `$${sl}`, rrRatio,
       setupName: `Real SMC Sweep (${sweepType === 'BUY' ? 'SSL Cleared' : 'BSL Cleared'})`,
       setupDescription: `ກວດພົບໄສ້ Rejection ແທ້ເທິງ M15! ເຈົ້າຕະຫຼາດກວາດສະພາບຄ່ອງຮອບ $${sweepCandle?.low || sweepCandle?.high} ແລ້ວດຶງກັບ.`,
       votes: { deepseek: sweepType, gemini: sweepType, groq: sweepType },
-      confidence: "96.5%",
-      timestamp: Date.now()
+      confidence: "96.5%", timestamp: now, lastResetTime: now
     };
   }
 
-  // 6. ຕັດເອົາແທ່ງທຽນແທ້ 16 ແທ່ງລ່າສຸດ ສົ່ງໃຫ້ Canvas
   const recent16Candles = candles.slice(-16).map(c => ({
-    datetime: c.datetime,
-    open: c.open,
-    high: c.high,
-    low: c.low,
-    close: c.close,
-    bull: c.close >= c.open,
-    isSweep: sweepCandle && c.datetime === sweepCandle.datetime
+    datetime: c.datetime, open: c.open, high: c.high, low: c.low, close: c.close,
+    bull: c.close >= c.open, isSweep: sweepCandle && c.datetime === sweepCandle.datetime
   }));
 
   const ema50 = candles.slice(-50).reduce((acc, cur) => acc + cur.close, 0) / 50;
   const htfTrend = p > ema50 ? "BULLISH" : "BEARISH";
 
   return {
-    price: p,
-    r1, r2, s1, s2,
-    htfTrend,
-    volumeDisplay,
-    activeSourceLabel,
-    isCleared: persistentSignal.isAutoTriggered,
-    signalAction: persistentSignal.type,
+    price: p, r1, r2, s1, s2, htfTrend, volumeDisplay, activeSourceLabel, isMockData,
+    isCleared: persistentSignal.isAutoTriggered, signalAction: persistentSignal.type,
     clearedPrice: persistentSignal.type === "BUY" ? s1 : r1,
     liquidityType: persistentSignal.setupName,
-    recentCandles: recent16Candles,
-    majorResistance: r2,
-    majorSupport: s2,
+    recentCandles: recent16Candles, majorResistance: r2, majorSupport: s2,
     scenario1: `ແນວຕ້ານ BSL $${r2}: ເຝົ້າລະວັງການ Sweep ໄສ້ແທ່ງທຽນ M15 ເພື່ອ Sell.`,
     scenario2: `ແນວຮັບ SSL $${s2}: ເຝົ້າລະວັງການ Sweep ໄສ້ແທ່ງທຽນ M15 ເພື່ອ Buy.`,
-    suggestedEntry: persistentSignal.entry,
-    suggestedSL: persistentSignal.sl,
-    suggestedTP: persistentSignal.tp3,
-    tp1: persistentSignal.tp1,
-    tp2: persistentSignal.tp2,
-    tp3: persistentSignal.tp3,
-    tp4: persistentSignal.tp4,
-    setupName: persistentSignal.setupName,
-    sweepTimestamp: persistentSignal.timestamp
+    suggestedEntry: persistentSignal.entry, suggestedSL: persistentSignal.sl, suggestedTP: persistentSignal.tp3,
+    tp1: persistentSignal.tp1, tp2: persistentSignal.tp2, tp3: persistentSignal.tp3, tp4: persistentSignal.tp4,
+    setupName: persistentSignal.setupName, sweepTimestamp: persistentSignal.timestamp,
+    signalAge: now - persistentSignal.timestamp
   };
 }
 
 // ============================================================
-// 4. TWITCH LIVE DEBATE (GROQ ENGINE)
+// 4. TWITCH LIVE DEBATE (✅ ຂໍ້ 8: Cache 60s)
 // ============================================================
+let cachedDebate = null;
+let lastDebateTime = 0;
+const DEBATE_CACHE_TTL = 60000;
+
 async function getOrGenerateLiveDebate(smcData) {
+  const now = Date.now();
+  if (cachedDebate && (now - lastDebateTime < DEBATE_CACHE_TTL)) return cachedDebate;
+
   const p = smcData.price.toFixed(2);
   const timeStr = new Date().toLocaleTimeString('lo-LA', {
-    timeZone: 'Asia/Vientiane',
-    hour12: false,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
+    timeZone: 'Asia/Vientiane', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'
   });
 
   try {
-    const prompt = `ທ່ານຄື 3 AI ຜູ້ຊ່ຽວຊານເທຣດທອງຄຳ XAU/USD (Tri-Brain Quant Committee):
-- ລາຄາຄຳ Real-time (${smcData.activeSourceLabel}): $${p}
+    const prompt = `ທ່ານຄື 3 AI ຜູ້ຊ່ຽວຊານເທຣດທອງຄຳ XAU/USD:
+- ລາຄາ: $${p} (${smcData.activeSourceLabel})
 - Trend: ${smcData.htfTrend}
-- Swing High BSL (ແນວຕ້ານແທ້): $${smcData.r1} | $${smcData.r2}
-- Swing Low SSL (ແນວຮັບແທ້): $${smcData.s1} | $${smcData.s2}
-- ສະຖານະ Sweep: ${persistentSignal.type} (${persistentSignal.setupName})
+- BSL: $${smcData.r1} | $${smcData.r2}
+- SSL: $${smcData.s1} | $${smcData.s2}
+- Sweep: ${persistentSignal.type}
 
-ສ້າງບົດສົນທະນາຖົກຖຽງ 3 ຂໍ້ຄວາມ ເປັນພາສາລາວ (ຮູບແບບ Twitch Chat):
-1. "AI_SMC_Specialist" (Badge: ⚔️ Mod): ວິເຄາະແທ່ງທຽນ M15 ແລະ BSL/SSL ທີ່ $${p}.
-2. "MM_Orderflow_Hunter" (Badge: 🎯 VIP): ວິເຄາະ Volume Stop Hunt ແລະ ຮອຍຕີນເຈົ້າຕະຫຼາດ.
-3. "AI_Swarm_Consensus" (Badge: 🤖 Bot): ຢືນຢັນຄຳສັ່ງ [${persistentSignal.type}] ພ້ອມ Entry, SL, TP.
-
-ສົ່ງເປັນ JSON:
-[
-  {"agent": "AI_SMC_Specialist", "badge": "mod", "color": "text-purple-400", "msg": "..."},
-  {"agent": "MM_Orderflow_Hunter", "badge": "vip", "color": "text-cyan-400", "msg": "..."},
-  {"agent": "AI_Swarm_Consensus", "badge": "bot", "color": "text-amber-400", "msg": "..."}
-]`;
+ສ້າງ 3 ຂໍ້ຄວາມພາສາລາວ (JSON array):
+[{"agent":"AI_SMC_Specialist","badge":"mod","color":"text-purple-400","msg":"..."},
+ {"agent":"MM_Orderflow_Hunter","badge":"vip","color":"text-cyan-400","msg":"..."},
+ {"agent":"AI_Swarm_Consensus","badge":"bot","color":"text-amber-400","msg":"..."}]`;
 
     let rawResponse = "";
     try {
-      rawResponse = await callGroqAI(prompt, "Twitch debater in Lao");
+      rawResponse = await withTimeout(callGroqAI(prompt, "Twitch debater in Lao"), 10000, "GroqDebate");
     } catch (e) {
-      rawResponse = await callOpenRouterAI(prompt, "Twitch debater in Lao");
+      rawResponse = await withTimeout(callOpenRouterAI(prompt, "Twitch debater in Lao"), 10000, "ORDebate");
     }
 
     const cleaned = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(cleaned);
-
-    return parsed.map(item => ({
-      id: Date.now() + Math.random(),
-      time: timeStr,
-      agent: item.agent,
-      badge: item.badge,
-      color: item.color,
-      message: item.msg
+    const result = parsed.map(item => ({
+      id: Date.now() + Math.random(), time: timeStr,
+      agent: item.agent, badge: item.badge, color: item.color, message: item.msg
     }));
-
+    cachedDebate = result; lastDebateTime = now;
+    return result;
   } catch (err) {
-    return [
-      { id: Date.now() + 1, time: timeStr, agent: "AI_SMC_Specialist", badge: "mod", color: "text-purple-400", message: `SMC 1,000 ແທ່ງ (${smcData.activeSourceLabel}) ຢືນຢັນລາຄາ $${p}. SSL: $${smcData.s1}, BSL: $${smcData.r1}.` },
-      { id: Date.now() + 2, time: timeStr, agent: "MM_Orderflow_Hunter", badge: "vip", color: "text-cyan-400", message: `Orderflow ຢືນຢັນ: ${smcData.volumeDisplay}. ມະຕິໂຫວດ [${persistentSignal.type}]!` },
-      { id: Date.now() + 3, time: timeStr, agent: "AI_Swarm_Consensus", badge: "bot", color: "text-amber-400", message: `ມະຕິ Swarm: ຄຳສັ່ງ [${persistentSignal.type}]. Entry: ${persistentSignal.entry}, SL: ${persistentSignal.sl}, TP1: ${persistentSignal.tp1}!` }
+    const fallback = [
+      { id: Date.now() + 1, time: timeStr, agent: "AI_SMC_Specialist", badge: "mod", color: "text-purple-400", message: `SMC 1,000 ແທ່ງ ຢືນຢັນລາຄາ $${p}. SSL: $${smcData.s1}, BSL: $${smcData.r1}.` },
+      { id: Date.now() + 2, time: timeStr, agent: "MM_Orderflow_Hunter", badge: "vip", color: "text-cyan-400", message: `Orderflow: ${smcData.volumeDisplay}. ມະຕິ [${persistentSignal.type}]!` },
+      { id: Date.now() + 3, time: timeStr, agent: "AI_Swarm_Consensus", badge: "bot", color: "text-amber-400", message: `ມະຕິ: [${persistentSignal.type}]. Entry: ${persistentSignal.entry}, SL: ${persistentSignal.sl}, TP1: ${persistentSignal.tp1}!` }
     ];
+    cachedDebate = fallback; lastDebateTime = now;
+    return fallback;
   }
 }
 
 // ============================================================
-// 5. GEOPOLITICAL SENTINEL & TRUMP FEED (FMP + 7-DAY FILTER)
+// 5. GEOPOLITICAL SENTINEL
 // ============================================================
 async function fetchFMPGeneralNews() {
   if (!FMP_KEY) return [];
@@ -447,12 +403,11 @@ async function fetchFMPGeneralNews() {
     const res = await axios.get(`https://financialmodelingprep.com/stable/news?page=0&limit=5&apikey=${FMP_KEY}`, { timeout: 4000 });
     if (Array.isArray(res.data)) {
       return res.data.map(item => ({
-        title: item.title,
-        source: item.publisher || "FMP News",
+        title: item.title, source: item.publisher || "FMP News",
         timestamp: new Date(item.publishedDate).getTime() || Date.now()
       }));
     }
-  } catch (e) {}
+  } catch (e) { safeLog("FMP news failed", e); }
   return [];
 }
 
@@ -465,12 +420,10 @@ async function getAdvancedGeopoliticalNews() {
     return cachedMacroNews;
   }
 
-  // 1. ດຶງຂ່າວ Trump ແທ້ ແລະ ກວດສອບອາຍຸ 7 ມື້
   let trumpRealData = null;
   try {
     const trumpRss = await axios.get('https://news.google.com/rss/search?q=Trump+tariff+OR+Trump+dollar+OR+Trump+economy+gold&hl=en-US&gl=US&ceid=US:en', {
-      timeout: 4500,
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+      timeout: 4500, headers: { 'User-Agent': 'Mozilla/5.0' }
     });
     const xml = trumpRss.data || "";
     const firstItem = (xml.match(/<item>([\s\S]*?)<\/item>/) || [])[1];
@@ -482,44 +435,36 @@ async function getAdvancedGeopoliticalNews() {
       const itemTimestamp = new Date(pubDate).getTime();
 
       if ((now - itemTimestamp) <= SEVEN_DAYS_MS) {
-        const promptTrump = `ແປຫົວຂໍ້ຂ່າວ Trump ນີ້ເປັນພາສາລາວ 100% ແລະ ວິເຄາະຜົນຕໍ່ທອງຄຳ:
-ຫົວຂໍ້: "${rawTitle}"
-ຕອບເປັນ JSON:
-{"titleLao": "...", "analysis": "...", "goldEffect": "Gold Bullish 🚀 ຫຼື Gold Bearish 🔻"}`;
+        const promptTrump = `ແປຫົວຂໍ້ຂ່າວ Trump ນີ້ເປັນພາສາລາວ 100%:
+"${rawTitle}"
+ຕອບ JSON: {"titleLao":"...","analysis":"...","goldEffect":"Gold Bullish 🚀"}`;
 
         try {
           const resAI = await executeTriBrainAI('gemini', promptTrump, "Financial translator");
           const cleaned = resAI.replace(/```json/g, '').replace(/```/g, '').trim();
           const parsedTrump = JSON.parse(cleaned);
-
           trumpRealData = {
             isExpired: false,
             post: `Trump / ${source}: "${parsedTrump.titleLao || rawTitle}"`,
-            source: source,
-            time: new Date(itemTimestamp).toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane', dateStyle: 'medium', timeStyle: 'short' }),
-            timestamp: itemTimestamp,
-            impactLevel: "ສຳຄັນສູງ 🚨",
-            aiAnalysis: parsedTrump.analysis || "ກຳລັງຕິດຕາມຜົນກະທົບຕໍ່ເງິນດອນລ່າ ແລະ ທອງຄຳ",
+            source, time: new Date(itemTimestamp).toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane', dateStyle: 'medium', timeStyle: 'short' }),
+            timestamp: itemTimestamp, impactLevel: "ສຳຄັນສູງ 🚨",
+            aiAnalysis: parsedTrump.analysis || "ກຳລັງຕິດຕາມຜົນກະທົບ",
             goldEffect: parsedTrump.goldEffect || "Gold Bullish 🚀"
           };
-        } catch (e) {}
+        } catch (e) { safeLog("Trump AI analysis failed", e); }
       }
     }
-  } catch (err) {}
+  } catch (err) { safeLog("Trump RSS failed", err); }
 
   if (!trumpRealData) {
     trumpRealData = {
-      isExpired: true,
-      post: "ບໍ່ມີຖະແຫຼງການ ຫຼື ຂ່າວ Trump ໃໝ່ພາຍໃນ 7 ມື້ຫຼ້າສຸດ (ລະບົບລຶບຂ່າວເກົ່າອອກອັດຕະໂນມັດແລ້ວ)",
-      source: "Macro Sentinel",
-      time: "ໝົດອາຍຸ (> 7 ມື້)",
-      impactLevel: "ປົກກະຕິ",
-      aiAnalysis: "ບໍ່ມີປັດໄຈກະທົບຈາກ Trump ໃນອາທິດນີ້.",
+      isExpired: true, post: "ບໍ່ມີຖະແຫຼງການ Trump ໃໝ່ພາຍໃນ 7 ມື້",
+      source: "Macro Sentinel", time: "ໝົດອາຍຸ (> 7 ມື້)",
+      impactLevel: "ປົກກະຕິ", aiAnalysis: "ບໍ່ມີປັດໄຈຈາກ Trump ໃນອາທິດນີ້.",
       goldEffect: "Neutral ⚖️"
     };
   }
 
-  // 2. ດຶງຂ່າວໂລກ FMP & Google RSS
   let rawHeadlines = await fetchFMPGeneralNews();
   if (rawHeadlines.length === 0) {
     try {
@@ -532,11 +477,10 @@ async function getAdvancedGeopoliticalNews() {
         const source = (item.match(/<source[^>]*>(.*?)<\/source>/) || [])[1] || "US Media";
         return {
           title: title.replace(/&quot;/g, '"').replace(/&amp;/g, '&'),
-          source,
-          timestamp: new Date(pubDate).getTime()
+          source, timestamp: new Date(pubDate).getTime()
         };
       }).filter(item => (now - item.timestamp) <= SEVEN_DAYS_MS);
-    } catch (e) {}
+    } catch (e) { safeLog("Google RSS news failed", e); }
   }
 
   let analyzedNews = [];
@@ -555,45 +499,33 @@ async function getAdvancedGeopoliticalNews() {
         analyzedNews = parsed.map((item, idx) => {
           const raw = rawHeadlines[idx] || rawHeadlines[0];
           return {
-            id: idx + 1,
-            title: item.title,
-            summary: item.summary,
+            id: idx + 1, title: item.title, summary: item.summary,
             aiGoldAnalysis: item.aiGoldAnalysis,
             category: item.category || "ພູມິລັດຖະສາດ & ເສດຖະກິດ",
             impact: item.impact || "ຮ້າຍແຮງ (Severe 🚨)",
             goldEffect: item.goldEffect || "Bullish 🚀",
-            source: raw.source,
-            timestamp: raw.timestamp,
+            source: raw.source, timestamp: raw.timestamp,
             time: new Date(raw.timestamp).toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane', dateStyle: 'medium', timeStyle: 'short' })
           };
         });
       }
-    } catch (err) {}
+    } catch (err) { safeLog("Geopolitics AI failed", err); }
   }
 
   if (analyzedNews.length === 0) {
-    analyzedNews = [
-      {
-        id: 1,
-        title: "ຄວາມຂັດແຍ່ງຕາເວັນອອກກາງທະວີຄວາມຮຸນແຮງ: ລາຄານ້ຳມັນດິບພຸ່ງກະຕຸ້ນຄວາມຢ້ານກົວເງິນເຟີ້",
-        summary: "ການປະທະກັນໃກ້ບໍລິເວນຂົນສົ່ງນ້ຳມັນ ເຮັດໃຫ້ລາຄານ້ຳມັນດິບໂລກດີດຕົວສູງຂຶ້ນ.",
-        aiGoldAnalysis: "Tri-Brain: ລາຄານ້ຳມັນແພງຈະດັນໃຫ້ເງິນເຟີ້ພຸ່ງສູງ ເປັນແຮງຂັບເຄື່ອນຫຼັກທີ່ດຶງເງິນເຂົ້າຊື້ຄຳ.",
-        category: "ສົງຄາມ & ນ້ຳມັນ",
-        impact: "ຮ້າຍແຮງ (Severe 🚨)",
-        goldEffect: "Bullish 🚀",
-        source: "Bloomberg / FMP",
-        timestamp: now - 1800000,
-        time: new Date(now - 1800000).toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane', dateStyle: 'medium', timeStyle: 'short' })
-      }
-    ];
+    analyzedNews = [{
+      id: 1,
+      title: "ຄວາມຂັດແຍ່ງຕາເວັນອອກກາງທະວີຄວາມຮຸນແຮງ: ລາຄານ້ຳມັນດິບພຸ່ງກະຕຸ້ນຄວາມຢ້ານກົວເງິນເຟີ້",
+      summary: "ການປະທະກັນໃກ້ບໍລິເວນຂົນສົ່ງນ້ຳມັນ ເຮັດໃຫ້ລາຄານ້ຳມັນດິບໂລກດີດຕົວສູງຂຶ້ນ.",
+      aiGoldAnalysis: "Tri-Brain: ລາຄານ້ຳມັນແພງຈະດັນໃຫ້ເງິນເຟີ້ພຸ່ງສູງ ເປັນແຮງຂັບເຄື່ອນຫຼັກທີ່ດຶງເງິນເຂົ້າຊື້ຄຳ.",
+      category: "ສົງຄາມ & ນ້ຳມັນ", impact: "ຮ້າຍແຮງ (Severe 🚨)",
+      goldEffect: "Bullish 🚀", source: "Bloomberg / FMP",
+      timestamp: now - 1800000,
+      time: new Date(now - 1800000).toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane', dateStyle: 'medium', timeStyle: 'short' })
+    }];
   }
 
-  cachedMacroNews = {
-    success: true,
-    count: analyzedNews.length,
-    trump: trumpRealData,
-    news: analyzedNews
-  };
+  cachedMacroNews = { success: true, count: analyzedNews.length, trump: trumpRealData, news: analyzedNews };
   lastMacroFetchTime = now;
   return cachedMacroNews;
 }
@@ -603,9 +535,7 @@ async function getAdvancedGeopoliticalNews() {
 // ============================================================
 async function getAdvancedRedNewsWithTriBrain(currentPrice) {
   const now = Date.now();
-  if (cachedRedNewsData && (now - lastRedNewsFetchTime < 15 * 60 * 1000)) {
-    return cachedRedNewsData;
-  }
+  if (cachedRedNewsData && (now - lastRedNewsFetchTime < 15 * 60 * 1000)) return cachedRedNewsData;
 
   let rawEvents = [];
   try {
@@ -613,28 +543,21 @@ async function getAdvancedRedNewsWithTriBrain(currentPrice) {
     if (Array.isArray(res.data)) {
       rawEvents = res.data.filter(item => item.country === 'USD' && item.impact === 'High');
     }
-  } catch (e) {}
+  } catch (e) { safeLog("ForexFactory calendar failed", e); }
 
   if (rawEvents.length === 0) {
-    rawEvents = [
-      {
-        title: "CPI m/m & Core CPI y/y (ເງິນເຟີ້ສະຫະລັດ)",
-        country: "USD",
-        impact: "High",
-        date: new Date(now + 3600000 * 24).toISOString(),
-        forecast: "0.3%",
-        previous: "0.2%"
-      }
-    ];
+    rawEvents = [{
+      title: "CPI m/m & Core CPI y/y (ເງິນເຟີ້ສະຫະລັດ)",
+      country: "USD", impact: "High",
+      date: new Date(now + 3600000 * 24).toISOString(),
+      forecast: "0.3%", previous: "0.2%"
+    }];
   }
 
   const list = rawEvents.slice(0, 4).map((raw, idx) => ({
-    id: idx + 1,
-    source: "Forex Factory USD Red News",
+    id: idx + 1, source: "Forex Factory USD Red News",
     time: new Date(raw.date).toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane', weekday: 'short', hour: '2-digit', minute: '2-digit' }),
-    title: `🔴 ${raw.title}`,
-    forecast: raw.forecast || "N/A",
-    previous: raw.previous || "N/A",
+    title: `🔴 ${raw.title}`, forecast: raw.forecast || "N/A", previous: raw.previous || "N/A",
     analysis: `<div class="p-2.5 bg-gray-800 rounded-xl text-xs text-gray-300"><b>AI ແຈ້ງເຕືອນ:</b> ເຝົ້າລະວັງການແກວ່ງໂຕຮຸນແຮງຮອບລາຄາ $${currentPrice.toFixed(2)}.</div>`
   }));
 
@@ -644,53 +567,46 @@ async function getAdvancedRedNewsWithTriBrain(currentPrice) {
 }
 
 // ============================================================
-// 7. API ENDPOINTS (CONNECTED TO 6 ENGINES)
+// 7. API ENDPOINTS
 // ============================================================
-app.get('/api/analysis', async (req, res) => {
+app.get('/api/analysis', apiLimiter, async (req, res) => {
   try {
     const candles = await get1000M15Candles();
     const smc = runAlgorithmicSMCOn1000Candles(candles);
-
     res.json({
       success: true,
       currentPrice: smc.price.toFixed(2),
       isCleared: persistentSignal.isAutoTriggered,
+      isMockData: smc.isMockData,
+      activeSourceLabel: smc.activeSourceLabel,
       trend: {
         direction: `${smc.activeSourceLabel} ${smc.htfTrend} (${persistentSignal.setupName})`,
         strength: persistentSignal.isAutoTriggered ? `SMC Confirmed (${persistentSignal.confidence})` : "Scanning 1,000 Candles Live",
-        votesForSignal: 965000,
-        votesTotal: 1000000,
+        votesForSignal: 965000, votesTotal: 1000000,
         winRate: persistentSignal.confidence || "96.5%",
         description: persistentSignal.setupDescription || "ລະບົບກຳລັງສະແກນ Swing High/Low ແລະ ໄສ້ Rejection ຈາກ 1,000 ແທ່ງ M15..."
       },
-      levels: {
-        r2: smc.r2.toFixed(2),
-        r1: smc.r1.toFixed(2),
-        s1: smc.s1.toFixed(2),
-        s2: smc.s2.toFixed(2)
-      },
+      levels: { r2: smc.r2.toFixed(2), r1: smc.r1.toFixed(2), s1: smc.s1.toFixed(2), s2: smc.s2.toFixed(2) },
       signal: persistentSignal
     });
   } catch (error) {
+    safeLog("api/analysis error", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.get('/api/liquidity-hunt', async (req, res) => {
+app.get('/api/liquidity-hunt', apiLimiter, async (req, res) => {
   try {
     const candles = await get1000M15Candles();
     const smc = runAlgorithmicSMCOn1000Candles(candles);
-    res.json({
-      success: true,
-      currentPrice: smc.price.toFixed(2),
-      ...smc
-    });
+    res.json({ success: true, currentPrice: smc.price.toFixed(2), ...smc });
   } catch (error) {
+    safeLog("api/liquidity-hunt error", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.get('/api/swarm-live-debate', async (req, res) => {
+app.get('/api/swarm-live-debate', apiLimiter, async (req, res) => {
   try {
     const candles = await get1000M15Candles();
     const smc = runAlgorithmicSMCOn1000Candles(candles);
@@ -705,33 +621,39 @@ app.get('/api/swarm-live-debate', async (req, res) => {
       messages
     });
   } catch (error) {
+    safeLog("api/swarm-live-debate error", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.get('/api/geopolitics', async (req, res) => {
+app.get('/api/geopolitics', apiLimiter, async (req, res) => {
   try {
     const data = await getAdvancedGeopoliticalNews();
     res.json(data);
   } catch (error) {
+    safeLog("api/geopolitics error", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.get('/api/red-news', async (req, res) => {
+app.get('/api/red-news', apiLimiter, async (req, res) => {
   try {
     const candles = await get1000M15Candles();
     const smc = runAlgorithmicSMCOn1000Candles(candles);
     const data = await getAdvancedRedNewsWithTriBrain(smc.price);
     res.json(data);
   } catch (error) {
+    safeLog("api/red-news error", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', chatLimiter, async (req, res) => {
   try {
     const { question } = req.body;
+    if (!question || question.length > 500) {
+      return res.status(400).json({ success: false, error: "ຄຳຖາມຕ້ອງມີຄວາມຍາວ 1-500 ຕົວອັກສອນ" });
+    }
     const candles = await get1000M15Candles();
     const smc = runAlgorithmicSMCOn1000Candles(candles);
 
@@ -745,22 +667,15 @@ app.post('/api/chat', async (req, res) => {
 ຕອບເປັນພາສາລາວທີ່ສຸພາບ, ຊັດເຈນ ຕາມຫຼັກ SMC.`;
 
     let answer = "";
-    try {
-      answer = await callOpenRouterAI(question, systemPrompt);
-    } catch (e1) {
-      try {
-        answer = await callGeminiAI(question, systemPrompt);
-      } catch (e2) {
-        answer = await callGroqAI(question, systemPrompt);
-      }
+    try { answer = await callOpenRouterAI(question, systemPrompt); }
+    catch (e1) {
+      try { answer = await callGeminiAI(question, systemPrompt); }
+      catch (e2) { answer = await callGroqAI(question, systemPrompt); }
     }
-
     res.json({ success: true, answer });
   } catch (error) {
-    res.json({ 
-      success: true, 
-      answer: `ລາຄາຄຳປັດຈຸບັນແມ່ນ: $${lastKnownRealPrice.toFixed(2)}.` 
-    });
+    safeLog("api/chat error", error);
+    res.json({ success: true, answer: `ລາຄາຄຳປັດຈຸບັນແມ່ນ: $${lastKnownRealPrice.toFixed(2)}.` });
   }
 });
 
