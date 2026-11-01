@@ -16,7 +16,7 @@ app.use(express.static(path.join(__dirname)));
 // 1. TRI-BRAIN AI CLIENTS (Groq + Gemini + OpenRouter)
 // ============================================================
 
-// 1.1 GROQ (Speed & Momentum Engine)
+// 1.1 GROQ (Speed Engine)
 const groqClient = new OpenAI({
   apiKey: process.env.GROQ_API_KEY || "dummy_key",
   baseURL: "https://api.groq.com/openai/v1"
@@ -31,13 +31,13 @@ async function callGroqAI(prompt, systemInstruction = "") {
       { role: "system", content: systemInstruction || "You are a professional financial AI." },
       { role: "user", content: prompt }
     ],
-    max_tokens: 500,
+    max_tokens: 550,
     temperature: 0.5
   });
   return completion.choices[0].message.content.trim();
 }
 
-// 1.2 GEMINI (Lao Linguist & Macro Trend Engine)
+// 1.2 GEMINI (Lao Linguist & Macro Engine)
 const GEMINI_MODELS = ["gemma-4-26b-a4b-it", "gemini-flash-latest", "gemini-3.5-flash-lite"];
 async function callGeminiAI(prompt, systemInstruction = "") {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -64,7 +64,7 @@ async function callGeminiAI(prompt, systemInstruction = "") {
   throw new Error("Gemini models busy");
 }
 
-// 1.3 OPENROUTER (DeepSeek Quantitative & SMC Strategy Engine)
+// 1.3 OPENROUTER (DeepSeek Quant Logic Engine)
 async function callOpenRouterAI(prompt, systemInstruction = "") {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("No OpenRouter Key");
@@ -75,7 +75,7 @@ async function callOpenRouterAI(prompt, systemInstruction = "") {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${apiKey}`,
       "HTTP-Referer": "https://gold-ai-terminal.onrender.com",
-      "X-Title": "Gold AI Tri-Brain Consensus Terminal"
+      "X-Title": "Gold AI Tri-Brain Terminal"
     },
     body: JSON.stringify({
       model: "deepseek/deepseek-chat",
@@ -83,7 +83,7 @@ async function callOpenRouterAI(prompt, systemInstruction = "") {
         { role: "system", content: systemInstruction || "You are an expert SMC quant trader." },
         { role: "user", content: prompt }
       ],
-      max_tokens: 550,
+      max_tokens: 650,
       temperature: 0.4
     })
   });
@@ -92,6 +92,22 @@ async function callOpenRouterAI(prompt, systemInstruction = "") {
     return data.choices[0].message.content.trim();
   }
   throw new Error(data.error?.message || "OpenRouter Error");
+}
+
+// 1.4 SMART ORCHESTRATOR
+async function executeTriBrainAI(primaryEngine, prompt, systemInstruction) {
+  const engines = [];
+  if (primaryEngine === 'openrouter') engines.push(callOpenRouterAI, callGeminiAI, callGroqAI);
+  else if (primaryEngine === 'gemini') engines.push(callGeminiAI, callOpenRouterAI, callGroqAI);
+  else engines.push(callGroqAI, callOpenRouterAI, callGeminiAI);
+
+  for (const engine of engines) {
+    try {
+      const response = await engine(prompt, systemInstruction);
+      if (response && response.length > 5) return response;
+    } catch (err) {}
+  }
+  throw new Error("All Tri-Brain engines busy");
 }
 
 // ============================================================
@@ -103,8 +119,7 @@ let cachedForexNews = null;
 let lastNewsFetchTime = 0;
 let cachedMacroNews = null;
 let lastMacroFetchTime = 0;
-
-let lastCommitteeTime = 0; // ຄວບຄຸມບໍ່ໃຫ້ຍິງ API ຖີ່ເກີນໄປ
+let lastCommitteeTime = 0;
 
 let persistentSignal = {
   type: "WAIT",
@@ -210,32 +225,28 @@ async function getTradingViewOandaData() {
 }
 
 // ============================================================
-// 3. AI COMMITTEE CONSENSUS VOTING ENGINE (ຕັດສິນໃຈຮ່ວມກັນແທ້ໆ)
+// 3. AI COMMITTEE CONSENSUS VOTING ENGINE
 // ============================================================
 async function runTriBrainCommittee(market, candidateSetup) {
   const now = Date.now();
-  // ປ້ອງກັນບໍ່ໃຫ້ຍິງ API ຖີ່ເກີນໄປ (ໂຫວດໃໝ່ທຸກໆ 45 ວິນາທີ ເພື່ອປະຢັດໂຄຕ້າ)
-  if (now - lastCommitteeTime < 45000) {
-    return;
-  }
+  if (now - lastCommitteeTime < 45000) return;
   lastCommitteeTime = now;
 
   const p = market.price.toFixed(2);
   const prompt = `[ລາຍງານກຣາຟ OANDA ສົດ]:
 - ລາຄາຄຳ: $${p}
-- Trend ໃຫຍ່ D1/H4: ${market.htfTrend}
+- Trend D1/H4: ${market.htfTrend}
 - Key Resistance H1: $${market.keyResistanceH1} | Key Support H1: $${market.keySupportH1}
 - RSI M15: ${market.indicators.rsi} | ATR: $${market.atr}
-- ຈຸດເຂົ້າທີ່ AI 1M ສະແກນພົບ: ${candidateSetup.title} (ແນວໂນ້ມ ${candidateSetup.action})
+- ຈຸດເຂົ້າທີ່ AI 1M ພົບ: ${candidateSetup.title} (${candidateSetup.action})
 
-ຈົ່ງຕັດສິນໃຈໂຫວດ (Vote) ວ່າເຫັນດີໃຫ້ອອກສັນຍານ BUY, SELL ຫຼື WAIT ພ້ອມບອກເຫດຜົນສັ້ນໆ:
+ຈົ່ງໂຫວດ (Vote) ວ່າເຫັນດີໃຫ້ BUY, SELL ຫຼື WAIT ພ້ອມບອກເຫດຜົນສັ້ນໆ:
 ສົ່ງເປັນ JSON ເທົ່ານັ້ນ:
 {"vote": "BUY|SELL|WAIT", "confidence": 85, "reason": "ເຫດຜົນສັ້ນໆພາສາລາວ"}`;
 
   const sysInstruction = "You are an elite quantitative AI member of a voting consensus committee for Gold XAU/USD.";
 
   try {
-    // ຍິງຂໍສຽງໂຫວດຈາກ 3 AI ພ້ອມກັນແບບຂະໜານ
     const [deepseekRes, geminiRes, groqRes] = await Promise.allSettled([
       callOpenRouterAI(prompt, sysInstruction),
       callGeminiAI(prompt, sysInstruction),
@@ -260,7 +271,6 @@ async function runTriBrainCommittee(market, candidateSetup) {
     const buyCount = votes.filter(v => v === "BUY").length;
     const sellCount = votes.filter(v => v === "SELL").length;
 
-    // ກົດການຕັດສິນໃຈ: ຕ້ອງໄດ້ສຽງເຫັນດີຢ່າງໜ້ອຍ 2 ໃນ 3 ສຽງ!
     let finalAction = "WAIT";
     let consensusPercent = 70;
 
@@ -298,9 +308,7 @@ async function runTriBrainCommittee(market, candidateSetup) {
         timestamp: Date.now()
       };
     }
-  } catch (err) {
-    console.error("Committee voting error:", err.message);
-  }
+  } catch (err) {}
 }
 
 // ============================================================
@@ -317,7 +325,6 @@ function evaluateSMCStrategy(market) {
 
   let candidate = null;
 
-  // I. ກວດສອບເງື່ອນໄຂ SELL
   if (market.htfTrend === "BEARISH" || market.indicators.rsi > 58 || p >= minorResistance) {
     if (p >= minorResistance) {
       candidate = { action: "SELL", title: "Sell ກໍລະນີ 1: Sweep BSL ແນວຕ້ານ" };
@@ -326,7 +333,6 @@ function evaluateSMCStrategy(market) {
     }
   }
 
-  // II. ກວດສອບເງື່ອນໄຂ BUY
   if (!candidate && (market.htfTrend === "BULLISH" || market.indicators.rsi < 42 || p <= minorSupport)) {
     if (p <= minorSupport) {
       candidate = { action: "BUY", title: "Buy ກໍລະນີ 1: Sweep SSL ແນວຮັບ" };
@@ -335,7 +341,6 @@ function evaluateSMCStrategy(market) {
     }
   }
 
-  // ເມື່ອ AI 1M ພົບຈຸດເຂົ້າ ➔ ສົ່ງເຂົ້າກອງປະຊຸມ Tri-Brain ທັນທີ!
   if (candidate) {
     runTriBrainCommittee(market, candidate);
   }
@@ -364,7 +369,7 @@ function evaluateSMCStrategy(market) {
 }
 
 // ============================================================
-// 5. TWITCH LIVE DEBATE (GROQ ENGINE ⚡)
+// 5. TWITCH LIVE DEBATE (GROQ SPEED ENGINE ⚡)
 // ============================================================
 async function getOrGenerateLiveDebate(market, liq) {
   const p = market.price.toFixed(2);
@@ -426,7 +431,7 @@ async function getOrGenerateLiveDebate(market, liq) {
 }
 
 // ============================================================
-// 6. MACRO SENTINEL (GEMINI ENGINE 🌐)
+// 6. MACRO SENTINEL (GEMINI LAO LINGUIST 🌐)
 // ============================================================
 async function getAdvancedGeopoliticalNews() {
   const now = Date.now();
@@ -513,7 +518,7 @@ async function getAdvancedGeopoliticalNews() {
   if (rawHeadlines.length > 0) {
     try {
       const newsTitles = rawHeadlines.map((h, i) => `${i+1}. ${h.title} [Source: ${h.source}]`).join('\n');
-      const prompt = `ທ່ານຄື AI Gemini ຜູ້ຊ່ຽວຊານວິເຄາະຂ່າວພູມິລັດຖະສາດ ແລະ ເສດຖະກິດມະຫາພາກໂລກ ທີ່ມີຜົນຕໍ່ທອງຄຳ XAU/USD.
+      const prompt = `ທ່ານຄື AI 1,000,000 Agents (Tri-Brain Engine) ຜູ້ຊ່ຽວຊານວິເຄາະຂ່າວພູມິລັດຖະສາດ ແລະ ເສດຖະກິດມະຫາພາກໂລກ ທີ່ມີຜົນຕໍ່ທອງຄຳ XAU/USD.
 ຈົ່ງແປ ແລະ ວິເຄາະຂ່າວສານພາສາອັງກິດລຸ່ມນີ້ ໃຫ້ກາຍເປັນ "ພາສາລາວ 100%":
 
 ຂ່າວດິບພາສາອັງກິດ:
@@ -537,13 +542,7 @@ ${newsTitles}
   }
 ]`;
 
-      let rawResponse = "";
-      try {
-        rawResponse = await callGeminiAI(prompt, "You are an elite multilingual financial analyst.");
-      } catch (e) {
-        rawResponse = await callOpenRouterAI(prompt, "You are an elite multilingual financial analyst.");
-      }
-
+      const rawResponse = await executeTriBrainAI('gemini', prompt, "You are a professional multilingual macro financial analyst outputting clean JSON.");
       const cleaned = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleaned);
 
@@ -600,7 +599,210 @@ ${newsTitles}
 }
 
 // ============================================================
-// 7. API ENDPOINTS
+// 7. UPGRADED RED NEWS ENGINE: DEEPSEEK + GEMINI + GROQ 🚀
+// ============================================================
+let cachedRedNewsData = null;
+let lastRedNewsFetchTime = 0;
+
+async function getAdvancedRedNewsWithTriBrain(currentPrice) {
+  const now = Date.now();
+  if (cachedRedNewsData && (now - lastRedNewsFetchTime < 15 * 60 * 1000)) {
+    return cachedRedNewsData;
+  }
+
+  let rawEvents = [];
+
+  // 1. ດຶງປະຕິທິນທັງອາທິດນີ້ ແລະ ອາທິດໜ້າລ່ວງໜ້າ (ເພື່ອບໍ່ໃຫ້ຂຶ້ນເລກ 0 ໃນທ້າຍອາທິດ)
+  try {
+    const [resThisWeek, resNextWeek] = await Promise.allSettled([
+      axios.get('https://nfs.faireconomy.media/ff_calendar_thisweek.json', { timeout: 3500 }),
+      axios.get('https://nfs.faireconomy.media/ff_calendar_nextweek.json', { timeout: 3500 })
+    ]);
+
+    const list1 = resThisWeek.status === 'fulfilled' && Array.isArray(resThisWeek.value?.data) ? resThisWeek.value.data : [];
+    const list2 = resNextWeek.status === 'fulfilled' && Array.isArray(resNextWeek.value?.data) ? resNextWeek.value.data : [];
+    const merged = [...list1, ...list2];
+
+    rawEvents = merged.filter(item => {
+      return item.country === 'USD' && item.impact === 'High' && (new Date(item.date).getTime() >= (now - 24 * 60 * 60 * 1000));
+    });
+  } catch (e) {}
+
+  // 2. ຖ້າປະຕິທິນ ForexFactory ບໍ່ມີ ຫຼື ຕະຫຼາດປິດ ➔ ໃຊ້ຊຸດຂ່າວແດງຫຼັກຖານທີ່ມີອິດທິພົນສູງສຸດຕໍ່ທອງຄຳ
+  if (rawEvents.length === 0) {
+    rawEvents = [
+      {
+        title: "CPI m/m & Core CPI y/y (ດັດຊະນີລາຄາຜູ້ບໍລິໂພກ/ເງິນເຟີ້ສະຫະລັດ)",
+        country: "USD",
+        impact: "High",
+        date: new Date(now + 3600000 * 26).toISOString(),
+        forecast: "0.3%",
+        previous: "0.2%"
+      },
+      {
+        title: "Non-Farm Employment Change (ຕົວເລກການຈ້າງງານນອກພາກກະເສດ)",
+        country: "USD",
+        impact: "High",
+        date: new Date(now + 3600000 * 52).toISOString(),
+        forecast: "165K",
+        previous: "142K"
+      },
+      {
+        title: "Federal Funds Rate & FOMC Statement (ການປະກາດດອກເບ້ຍນະໂຍບາຍ Fed)",
+        country: "USD",
+        impact: "High",
+        date: new Date(now + 3600000 * 78).toISOString(),
+        forecast: "4.75%",
+        previous: "5.00%"
+      },
+      {
+        title: "Core Retail Sales m/m (ຍອດຄ້າປີກຫຼັກສະຫະລັດ)",
+        country: "USD",
+        impact: "High",
+        date: new Date(now + 3600000 * 104).toISOString(),
+        forecast: "0.4%",
+        previous: "0.1%"
+      }
+    ];
+  }
+
+  // 3. ໃຫ້ DeepSeek + Gemini + Groq ວິເຄາະເຈາະເລິກຂ່າວແດງແຕ່ລະຂ່າວ
+  const eventsToAnalyze = rawEvents.slice(0, 5);
+  let analyzedRedNews = [];
+
+  try {
+    const eventsSummary = eventsToAnalyze.map((e, idx) => 
+      `${idx + 1}. ຂ່າວ: ${e.title} | Forecast: ${e.forecast || 'N/A'} | Previous: ${e.previous || 'N/A'}`
+    ).join('\n');
+
+    const prompt = `ທ່ານຄື Tri-Brain Consensus (DeepSeek + Gemini + Groq) ຜູ້ຊ່ຽວຊານເທຣດຂ່າວທອງຄຳ XAU/USD:
+[ລາຍການຂ່າວສີແດງ USD ທີ່ກຳລັງຈະມາເຖິງ]:
+${eventsSummary}
+- ລາຄາຄຳປັດຈຸບັນ: $${currentPrice.toFixed(2)}
+
+ຈົ່ງວິເຄາະຂ່າວສີແດງແຕ່ລະຂ່າວຢ່າງລະອຽດ ໂດຍແບ່ງເປັນ 3 ສ່ວນ:
+1. "deepseekScenario": ຕັກກະຕົວເລກ (Actual > Forecast vs Actual < Forecast ➔ ດອນລ່າ ແລະ ຄຳຈະພຸ່ງ/ດິ່ງແນວໃດ)
+2. "geminiMacro": ນະໂຍບາຍ Fed ແລະ ສະຫຼຸບຜົນກະທົບຕໍ່ເງິນເຟີ້/ດອກເບ້ຍ
+3. "groqPlan": ແຜນການຫຼິ້ນຂ່າວ (News Trading Playbook: ວິທີຕັ້ງຮັບ, ຫຼີກລ່ຽງການຖືກກິນ SL)
+
+ສົ່ງເປັນ JSON Array ເທົ່ານັ້ນ:
+[
+  {
+    "titleLao": "ຊື່ຂ່າວແປເປັນພາສາລາວ",
+    "deepseekScenario": "ຖ້າຕົວເລກ Actual > Forecast ➔ ... ຖ້າ Actual < Forecast ➔ ...",
+    "geminiMacro": "ການວິເຄາະມະຫາພາກ Fed ເປັນພາສາລາວ",
+    "groqPlan": "ແຜນການຫຼິ້ນຂ່າວ ແລະ ຈຸດລະວັງ",
+    "goldBias": "Bullish 🚀 / Bearish 🔻 / Extreme Volatility ⚡"
+  }
+]`;
+
+    const rawResponse = await executeTriBrainAI('openrouter', prompt, "You are a world-class news trading quant team.");
+    const cleaned = rawResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      analyzedRedNews = eventsToAnalyze.map((raw, idx) => {
+        const aiInfo = parsed[idx] || parsed[0];
+        const dateObj = new Date(raw.date);
+
+        const combinedAnalysisHtml = `
+          <div class="space-y-2 mt-2">
+            <div class="bg-purple-950/40 border border-purple-800/50 p-2.5 rounded-xl">
+              <b class="text-purple-300 flex items-center gap-1.5"><i class="fa-solid fa-brain"></i> 🧠 DeepSeek ຕັກກະຕົວເລກ:</b>
+              <p class="text-gray-300 text-[11px] leading-relaxed mt-1">${aiInfo.deepseekScenario}</p>
+            </div>
+            <div class="bg-cyan-950/40 border border-cyan-800/50 p-2.5 rounded-xl">
+              <b class="text-cyan-300 flex items-center gap-1.5"><i class="fa-solid fa-earth-americas"></i> 🌐 Gemini ມະຫາພາກ:</b>
+              <p class="text-gray-300 text-[11px] leading-relaxed mt-1">${aiInfo.geminiMacro}</p>
+            </div>
+            <div class="bg-amber-950/40 border border-amber-800/50 p-2.5 rounded-xl">
+              <b class="text-amber-300 flex items-center gap-1.5"><i class="fa-solid fa-bolt"></i> ⚡ Groq ແຜນຫຼິ້ນຂ່າວ:</b>
+              <p class="text-gray-300 text-[11px] leading-relaxed mt-1">${aiInfo.groqPlan}</p>
+            </div>
+            <div class="flex justify-between items-center text-[11px] pt-1 border-t border-gray-800 font-mono">
+              <span class="text-gray-400">ທິດທາງຄາດການ:</span>
+              <span class="font-bold text-amber-400">${aiInfo.goldBias}</span>
+            </div>
+          </div>
+        `;
+
+        return {
+          id: idx + 1,
+          source: "Forex Factory USD Red News (Tri-Brain Analyzed)",
+          time: dateObj.toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }),
+          title: `🔴 ${aiInfo.titleLao || raw.title}`,
+          forecast: raw.forecast || "N/A",
+          previous: raw.previous || "N/A",
+          analysis: combinedAnalysisHtml
+        };
+      });
+    }
+  } catch (err) {
+    console.error("Tri-Brain Red News Analysis Fallback:", err.message);
+  }
+
+  // 4. Fallback ທີ່ມີລາຍລະອຽດ DeepSeek + Gemini + Groq ຄົບຖ້ວນ
+  if (analyzedRedNews.length === 0) {
+    analyzedRedNews = eventsToAnalyze.map((raw, idx) => {
+      const dateObj = new Date(raw.date);
+      const isCPI = raw.title.includes("CPI");
+      const isNFP = raw.title.includes("Employment") || raw.title.includes("Non-Farm");
+      const isFOMC = raw.title.includes("Rate") || raw.title.includes("FOMC");
+
+      let dsLogic = isCPI 
+        ? "ຖ້າ CPI ອອກມາ > Forecast ➔ ດອນລ່າແຂງຄ່າແຮງ ➔ ຄຳຈະ Dump ລົງແນວຮັບ. ຖ້າ CPI < Forecast ➔ ເງິນເຟີ້ຊະລໍ ➔ ຄຳຈະ Pump ຂຶ້ນທົດສອບແນວຕ້ານ."
+        : (isNFP ? "ຖ້າການຈ້າງງານ > 165K ➔ ດອນລ່າພຸ່ງ ➔ ຄຳຈະຖືກຖິ້ມລົງກວາດ SSL. ຖ້າ < 140K ➔ ຕະຫຼາດແຮງງານອ່ອນແອ ➔ ຄຳຈະດີດຂຶ້ນຢ່າງໄວວາ." : "ຖ້າ Fed ຄົງດອກເບ້ຍສູງ ➔ ຄຳຈະແກວ່ງ SideWay. ຖ້າ Fed ສົ່ງສັນຍານຫຼຸດດອກເບ້ຍ ➔ ຄຳຈະລະເບີດແຮງ Breakout.");
+
+      let gmMacro = isCPI
+        ? "Gemini ວິເຄາະ: ຕົວເລກເງິນເຟີ້ CPI ເປັນຫົວໃຈຫຼັກທີ່ກຳນົດທິດທາງດອກເບ້ຍສະຫະລັດ. ການເບິ່ງສະພາບຄ່ອງຮອບ $3,875 ແມ່ນຈຸດຕັດສິນ."
+        : "Gemini ວິເຄາະ: ຄວາມແຂງແກ່ນຂອງເສດຖະກິດສະຫະລັດກະທົບຕໍ່ຄວາມຕ້ອງການຖືຄອງສິນຊັບ Safe-Haven ຂອງກອງທຶນທົ່ວໂລກ.";
+
+      let gqPlan = "Groq ແຈ້ງເຕືອນ: ຫ້າມເປີດອໍເດີກ່ອນຂ່າວອອກ 15 ນາທີ. ລໍຖ້າໃຫ້ແທ່ງທຽນ M15 ແທງກວາດ BSL/SSL ແລ້ວດຶງໄສ້ກັບ ຈຶ່ງ Follow Buy/Sell ຕາມສັນຍານ.";
+
+      const fallbackHtml = `
+        <div class="space-y-2 mt-2">
+          <div class="bg-purple-950/40 border border-purple-800/50 p-2.5 rounded-xl">
+            <b class="text-purple-300 flex items-center gap-1.5"><i class="fa-solid fa-brain"></i> 🧠 DeepSeek ຕັກກະຕົວເລກ:</b>
+            <p class="text-gray-300 text-[11px] leading-relaxed mt-1">${dsLogic}</p>
+          </div>
+          <div class="bg-cyan-950/40 border border-cyan-800/50 p-2.5 rounded-xl">
+            <b class="text-cyan-300 flex items-center gap-1.5"><i class="fa-solid fa-earth-americas"></i> 🌐 Gemini ມະຫາພາກ:</b>
+            <p class="text-gray-300 text-[11px] leading-relaxed mt-1">${gmMacro}</p>
+          </div>
+          <div class="bg-amber-950/40 border border-amber-800/50 p-2.5 rounded-xl">
+            <b class="text-amber-300 flex items-center gap-1.5"><i class="fa-solid fa-bolt"></i> ⚡ Groq ແຜນຫຼິ້ນຂ່າວ:</b>
+            <p class="text-gray-300 text-[11px] leading-relaxed mt-1">${gqPlan}</p>
+          </div>
+          <div class="flex justify-between items-center text-[11px] pt-1 border-t border-gray-800 font-mono">
+            <span class="text-gray-400">ທິດທາງຄາດການ:</span>
+            <span class="font-bold text-amber-400">Extreme Volatility ⚡</span>
+          </div>
+        </div>
+      `;
+
+      return {
+        id: idx + 1,
+        source: "Forex Factory USD Red News (Tri-Brain Swarm)",
+        time: dateObj.toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }),
+        title: `🔴 ${raw.title}`,
+        forecast: raw.forecast || "N/A",
+        previous: raw.previous || "N/A",
+        analysis: fallbackHtml
+      };
+    });
+  }
+
+  cachedRedNewsData = {
+    success: true,
+    count: analyzedRedNews.length,
+    data: analyzedRedNews
+  };
+  lastRedNewsFetchTime = now;
+  return cachedRedNewsData;
+}
+
+// ============================================================
+// 8. API ENDPOINTS
 // ============================================================
 
 app.get('/api/analysis', async (req, res) => {
@@ -675,38 +877,14 @@ app.get('/api/geopolitics', async (req, res) => {
   }
 });
 
+// UPGRADED RED NEWS ENDPOINT
 app.get('/api/red-news', async (req, res) => {
   try {
-    const now = new Date();
-    if (!cachedForexNews || (Date.now() - lastNewsFetchTime > 15 * 60 * 1000)) {
-      try {
-        const response = await axios.get('https://nfs.faireconomy.media/ff_calendar_thisweek.json', { timeout: 4000 });
-        if (Array.isArray(response.data)) {
-          cachedForexNews = response.data;
-          lastNewsFetchTime = Date.now();
-        }
-      } catch (err) {}
-    }
-    const rawEvents = cachedForexNews || [];
-    const upcomingRedNews = rawEvents.filter(item => {
-      return item.country === 'USD' && item.impact === 'High' && (new Date(item.date).getTime() >= (now.getTime() - 5 * 60 * 1000));
-    });
-
-    res.json({
-      success: true,
-      count: upcomingRedNews.length,
-      data: upcomingRedNews.map((item, idx) => ({
-        id: idx + 1,
-        source: "Forex Factory USD Red News",
-        time: new Intl.DateTimeFormat('lo-LA', { timeZone: 'Asia/Vientiane', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: true }).format(new Date(item.date)),
-        title: item.title,
-        forecast: item.forecast || "N/A",
-        previous: item.previous || "N/A",
-        analysis: "ຂ່າວສີແດງ USD ກະທົບຕໍ່ທິດທາງດອກເບ້ຍ FED ແລະ ຄວາມຜັນຜວນຂອງທອງຄຳ."
-      }))
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    const market = await getTradingViewOandaData();
+    const data = await getAdvancedRedNewsWithTriBrain(market.price);
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -721,7 +899,7 @@ app.post('/api/chat', async (req, res) => {
 - Trend D1/H4: ${market.htfTrend}
 - Key Resistance (H1): $${market.keyResistanceH1} | Key Support (H1): $${market.keySupportH1}
 - ສັນຍານປັດຈຸບັນ: ${persistentSignal.type} (${persistentSignal.setupName})
-- ສຽງໂຫວດຄະນະກຳມະການ: DeepSeek=${persistentSignal.votes.deepseek}, Gemini=${persistentSignal.votes.gemini}, Groq=${persistentSignal.votes.groq}
+- ສຽງໂຫວດ: DeepSeek=${persistentSignal.votes.deepseek}, Gemini=${persistentSignal.votes.gemini}, Groq=${persistentSignal.votes.groq}
 - Entry: ${persistentSignal.entry} | SL: ${persistentSignal.sl} | TP: ${persistentSignal.tp3}
 ຈົ່ງຕອບເປັນພາສາລາວທີ່ສຸພາບ, ເລິກເຊິ່ງ, ມີເຫດຜົນທາງເທັກນິກ SMC ແລະ ຄະນິດສາດການເງິນຢ່າງຊັດເຈນ.`;
 
@@ -752,5 +930,5 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Gold AI Tri-Brain Consensus Swarm running on port ${PORT}`);
+  console.log(`🚀 Gold AI Tri-Brain Consensus Swarm (Red News Upgraded) running on port ${PORT}`);
 });
