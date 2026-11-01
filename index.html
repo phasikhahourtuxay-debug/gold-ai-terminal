@@ -78,7 +78,7 @@
         </div>
     </header>
 
-    <!-- Navigation Tabs ຄົບ 5 ແທັບ -->
+    <!-- Navigation Tabs -->
     <nav class="flex flex-wrap items-center gap-2.5 bg-gray-900/90 border border-gray-800 p-2 rounded-2xl mb-6 backdrop-blur">
         <button id="tab-btn-main" onclick="switchTab('main')" 
                 class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-amber-500 text-slate-950 shadow-md">
@@ -314,7 +314,7 @@
                     <h2 class="text-sm md:text-base font-bold text-white flex items-center gap-2">
                         #xauusd_ai_swarm_debate <span class="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-wider animate-pulse">LIVE</span>
                     </h2>
-                    <p class="text-xs text-gray-400">Stream ການວິເຄາະສົດ Real-Time ໂດຍ 3 AI ຜູ້ຊ່ຽວຊານ (1 ນາທີຕໍ່ 1 ຮອບ)</p>
+                    <p class="text-xs text-gray-400">Stream ການວິເຄາະສົດ Real-Time ໂດຍ 3 AI ຜູ້ຊ່ຽວຊານ (ສົ່ງຂໍ້ຄວາມທຸກໆ 1 ນາທີ)</p>
                 </div>
             </div>
             <div class="flex items-center gap-3 mt-2 sm:mt-0">
@@ -335,7 +335,7 @@
 
                 <div id="twitch-chat-stream" class="flex-1 overflow-y-auto custom-scroll p-3 space-y-1.5 text-xs font-mono leading-relaxed bg-[#0b0e14]">
                     <div class="text-gray-500 text-[11px] py-1 border-b border-gray-800/60 mb-2">
-                        [System]: ຍິນດີຕ້ອນຮັບສູ່ຫ້ອງ AI Live Debate. ລະບົບຈະສົນທະນາວິເຄາະທຸກໆ 1 ນາທີ...
+                        [System]: ຍິນດີຕ້ອນຮັບສູ່ຫ້ອງ AI Live Debate. ລະບົບສົນທະນາວິເຄາະທຸກໆ 1 ນາທີ...
                     </div>
                 </div>
 
@@ -553,6 +553,12 @@
                 const data = await res.json();
                 if (!data.success) return;
 
+                // Sync ລາຄາໄປຍັງແຖບຫ້ອງຖົກຖຽງທັນທີ
+                const debateStatusEl = document.getElementById('debate-chart-status');
+                if (debateStatusEl) {
+                    debateStatusEl.innerText = `XAU: $${data.currentPrice} | RSI: ${data.rsi} | ${data.htfTrend}`;
+                }
+
                 document.getElementById('trend-direction').innerText = data.htfTrend;
                 document.getElementById('rsi-badge').innerText = `RSI: ${data.rsi}`;
                 document.getElementById('trend-desc').innerText = `* Setup SMC: ${data.signal.setupRule}`;
@@ -709,7 +715,7 @@
             });
         }
 
-        // Live Debate (ແກ້ໄຂໃຫ້ດຶງລາຄາ Live ແລະ Stream ທຸກໆ 1 ນາທີ)
+        // Live Debate (ອັບເດດຂໍ້ຄວາມທຸກໆ 1 ນາທີ)
         async function fetchAutoBotDebate() {
             try {
                 const res = await fetch(`${API_BASE}/swarm-live-debate`);
@@ -810,17 +816,17 @@
         }
 
         // ==========================================
-        // MAIN RUNTIME LOOPS
+        // RUNTIME LOOPS
         // ==========================================
         fetchAnalysis();
         fetchGeopolitics();
         fetchRedNews();
         fetchLiquidityAnalysis();
-        fetchAutoBotDebate(); // ຮອບທຳອິດເມື່ອເປີດໜ້າເວັບ
+        fetchAutoBotDebate();
 
         setInterval(fetchAnalysis, 4000);              // ອັບເດດລາຄາທຸກໆ 4 ວິນາທີ
         setInterval(fetchLiquidityAnalysis, 6000);     // ອັບເດດ Liquidity ທຸກໆ 6 ວິນາທີ
-        setInterval(fetchAutoBotDebate, 60000);        // 🔥 ຕັ້ງເປັນ 60,000ms = 1 ນາທີຕໍ່ 1 ຄັ້ງຕາມທີ່ຂໍ
+        setInterval(fetchAutoBotDebate, 60000);        // 🔥 ຕັ້ງເປັນ 60,000ms = 1 ນາທີຕໍ່ 1 ຮອບ
         setInterval(fetchGeopolitics, 60000);          // ອັບເດດຂ່າວໂລກທຸກໆ 1 ນາທີ
     </script>
 </body>
