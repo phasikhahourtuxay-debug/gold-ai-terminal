@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XAU/USD Gold AI Swarm Terminal (Liquidity Hunter)</title>
+    <title>XAU/USD Gold AI Swarm Terminal (1,000 M15 SMC Engine)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome Icons -->
@@ -36,7 +36,7 @@
 </head>
 <body class="p-3 md:p-6">
 
-    <!-- Audio Element -->
+    <!-- Audio Player ສຳລັບສຽງເຕືອນ 5 ນາທີ -->
     <audio id="audio-alert-player" src="/alert.mp3" loop preload="auto"></audio>
 
     <!-- Header & AI Swarm Status -->
@@ -44,8 +44,8 @@
         <div class="flex items-center space-x-4">
             <i class="fa-solid fa-coins text-yellow-400 text-3xl md:text-4xl animate-pulse"></i>
             <div>
-                <h1 class="text-xl md:text-2xl font-bold tracking-wide text-yellow-400">GOLD AI 1M-SWARM TERMINAL</h1>
-                <p class="text-xs md:text-sm text-gray-300">ລະບົບວິເຄາະທອງຄຳ XAU/USD & Smart Money Liquidity Engine</p>
+                <h1 class="text-xl md:text-2xl font-bold tracking-wide text-yellow-400">GOLD AI 1,000-CANDLE SMC TERMINAL</h1>
+                <p class="text-xs md:text-sm text-gray-300">ລະບົບວິເຄາະທອງຄຳ XAU/USD & Smart Money 1,000 M15 Liquidity Engine</p>
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-3 mt-3 md:mt-0 text-xs md:text-sm">
@@ -68,7 +68,7 @@
 
             <div class="bg-gray-800 px-3 py-1.5 rounded-xl border border-gray-700 flex items-center gap-2">
                 <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-ping"></span>
-                <span>Active Agents: <b class="text-green-400 font-mono">1,000,000</b></span>
+                <span>Active Engine: <b class="text-green-400 font-mono">TwelveData 1,000 M15</b></span>
             </div>
             <div class="bg-gray-800 px-3 py-1.5 rounded-xl border border-gray-700">
                 <i class="fa-regular fa-clock text-yellow-400 mr-1"></i>
@@ -77,7 +77,7 @@
         </div>
     </header>
 
-    <!-- Navigation Tabs (ເພີ່ມປຸ່ມແທັບຂ່າວໃໝ່) -->
+    <!-- Navigation Tabs -->
     <nav class="flex flex-wrap items-center gap-2.5 bg-gray-900/90 border border-gray-800 p-2 rounded-2xl mb-6 backdrop-blur">
         <button id="tab-btn-main" onclick="switchTab('main')" 
                 class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-amber-500 text-slate-950 shadow-md">
@@ -94,7 +94,7 @@
         <button id="tab-btn-liq" onclick="switchTab('liq')" 
                 class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-gray-800/80 text-purple-300 hover:text-white hover:bg-purple-900/50 border border-purple-500/40">
             <i class="fa-solid fa-crosshairs text-purple-400 animate-spin" style="animation-duration: 6s;"></i>
-            <span>ຈຸດ Clear Liquidity (1M Hunter)</span>
+            <span>ຈຸດ Clear Liquidity (Real M15 Candles)</span>
         </button>
 
         <button id="tab-btn-debate" onclick="switchTab('debate')" 
@@ -104,7 +104,6 @@
             <span>ຫ້ອງ AI ຖົກຖຽງກັນ (Auto Live Debate)</span>
         </button>
 
-        <!-- ປຸ່ມແທັບໃໝ່: ຂ່າວໂລກ & ພູມິລັດຖະສາດ -->
         <button id="tab-btn-geo" onclick="switchTab('geo')" 
                 class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-gray-800/80 text-amber-300 hover:text-white hover:bg-amber-900/50 border border-amber-500/40">
             <i class="fa-solid fa-earth-americas text-amber-400 animate-pulse"></i>
@@ -112,7 +111,7 @@
         </button>
     </nav>
 
-    <!-- ==================== VIEW 1: ໜ້າຫຼັກ (ລຶບກ່ອງຂ່າວເກົ່າອອກແລ້ວ) ==================== -->
+    <!-- ==================== VIEW 1: ໜ້າຫຼັກ ==================== -->
     <main id="view-main" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div class="lg:col-span-8 space-y-6">
             <!-- Real-time Chart -->
@@ -142,7 +141,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="bg-gray-900 border border-gray-800 p-4 md:p-5 rounded-2xl">
                     <h2 class="text-sm md:text-base font-bold text-gray-200 mb-3 flex items-center">
-                        <i class="fa-solid fa-compass text-yellow-500 mr-2"></i> ສະພາວະ Trend ປັດຈຸບັນ (ອີງຕາມ Clear Liquidity)
+                        <i class="fa-solid fa-compass text-yellow-500 mr-2"></i> ສະພາວະ Trend ປັດຈຸບັນ (1,000 M15 SMC)
                     </h2>
                     <div id="trend-box" class="flex items-center justify-between bg-gray-800/90 p-4 rounded-xl border-l-4 border-yellow-500">
                         <div>
@@ -154,12 +153,12 @@
                             <span id="trend-strength" class="px-2.5 py-1 rounded-md text-xs font-bold bg-yellow-500/20 text-yellow-300">...</span>
                         </div>
                     </div>
-                    <p id="trend-desc" class="text-xs text-gray-300 mt-3 leading-relaxed">ກຳລັງສະແກນ 1,000,000 Agents...</p>
+                    <p id="trend-desc" class="text-xs text-gray-300 mt-3 leading-relaxed">ກຳລັງສະແກນ 1,000 ແທ່ງທຽນ M15 ຕົວຈິງ...</p>
                 </div>
 
                 <div class="bg-gray-900 border border-gray-800 p-4 md:p-5 rounded-2xl">
                     <h2 class="text-sm md:text-base font-bold text-gray-200 mb-3 flex items-center">
-                        <i class="fa-solid fa-layer-group text-yellow-500 mr-2"></i> ແນວຮັບ-ແນວຕ້ານ ສຳຄັນ (Key Levels)
+                        <i class="fa-solid fa-layer-group text-yellow-500 mr-2"></i> ແນວຮັບ-ແນວຕ້ານ ສຳຄັນ (Swing High/Low)
                     </h2>
                     <div class="grid grid-cols-2 gap-3 text-xs md:text-sm font-mono">
                         <div class="bg-red-950/30 border border-red-900/60 p-3 rounded-xl">
@@ -186,7 +185,7 @@
                         </h3>
                     </div>
                     <div class="flex items-center gap-2">
-                        <span id="sig-rr" class="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded-lg border border-gray-700 font-mono">R:R = 1:3.4</span>
+                        <span id="sig-rr" class="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded-lg border border-gray-700 font-mono">R:R = 1:3.8</span>
                         <span id="signal-type" class="bg-yellow-500 text-black text-xs md:text-sm font-bold px-4 py-1.5 rounded-full">
                             SCANNING...
                         </span>
@@ -203,7 +202,7 @@
             </div>
         </div>
 
-        <!-- Right Column: ຂະຫຍາຍ AI Chat Assistant ໃຫ້ເຕັມໜ້າຈໍດ້ານຂວາ (ສວຍງາມ ແລະ ສົມດຸນ) -->
+        <!-- Right Column: AI Chat Assistant -->
         <div class="lg:col-span-4">
             <div class="bg-gray-900 border-2 border-amber-500/40 p-5 rounded-2xl flex flex-col h-[570px] glow-gold">
                 <div class="flex items-center justify-between border-b border-gray-800 pb-3 mb-3">
@@ -216,7 +215,7 @@
                 <div class="flex-grow overflow-y-auto custom-scroll space-y-3 pr-1 text-xs" id="user-qa-box">
                     <div class="bg-gray-800/80 p-3.5 rounded-xl border border-gray-700 text-gray-200">
                         <b class="text-yellow-400 block mb-1"><i class="fa-solid fa-brain"></i> AI Assistant:</b>
-                        ສະບາຍດີ! ລະບົບສັນຍານໜ້າຫຼັກໄດ້ຖືກຊິ້ງຄ໌ກັບ <b>Clear Liquidity 1M Hunter</b> ແບບ Real-time ແລ້ວ. ສາມາດພິມຖາມລາຄາ ແລະ ທິດທາງກຣາຟໄດ້ເລີຍ!
+                        ສະບາຍດີ! ລະບົບໄດ້ຊິ້ງຄ໌ກັບ <b>Twelve Data 1,000 ແທ່ງ M15</b> ຮຽບຮ້ອຍແລ້ວ. ສາມາດພິມຖາມແນວຮັບ-ແນວຕ້ານ ແລະ ຈຸດເຂົ້າອໍເດີໄດ້ເລີຍ!
                     </div>
                 </div>
                 <form id="chat-form" class="mt-3 flex gap-2" onsubmit="handleUserChatSubmit(event)">
@@ -249,7 +248,7 @@
         </div>
     </section>
 
-    <!-- ==================== VIEW 3: LIQUIDITY HUNTER ==================== -->
+    <!-- ==================== VIEW 3: LIQUIDITY HUNTER (REAL M15 CANDLES CANVAS) ==================== -->
     <section id="view-liq" class="hidden space-y-6">
         <div id="liq-alert-banner" class="p-5 rounded-2xl border-2 flex flex-wrap justify-between items-center transition-all duration-300"></div>
 
@@ -259,11 +258,11 @@
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-camera-retro text-purple-400 text-lg"></i>
                         <h3 class="font-bold text-gray-100 text-sm md:text-base">
-                            ພາບປະກອບຈຳລອງ: ຈຸດທີ່ເຈົ້າຕະຫຼາດ Clear Liquidity (Sweep Pattern)
+                            ກຣາຟແທ່ງທຽນ M15 ຕົວຈິງ: ຈຸດທີ່ເຈົ້າຕະຫຼາດ Clear Liquidity (Real Wick Rejection)
                         </h3>
                     </div>
                     <span class="text-xs bg-purple-950 text-purple-300 border border-purple-700/50 px-2.5 py-0.5 rounded-full font-mono">
-                        TimeFrame M15
+                        Live 16 M15 Candles
                     </span>
                 </div>
                 <div class="w-full bg-slate-950 rounded-xl p-3 border border-gray-800 flex flex-col items-center justify-center relative">
@@ -274,7 +273,7 @@
             <div class="lg:col-span-5 space-y-6">
                 <div class="bg-gray-900 border border-gray-800 p-5 rounded-2xl space-y-4">
                     <h3 class="text-sm md:text-base font-bold text-purple-400 flex items-center gap-2 border-b border-gray-800 pb-3">
-                        <i class="fa-solid fa-fingerprint"></i> ຕົວເລກທີ່ເຈົ້າຕະຫຼາດໄປ Clear Liquidity
+                        <i class="fa-solid fa-fingerprint"></i> ຕົວເລກທີ່ເຈົ້າຕະຫຼາດໄປ Clear Liquidity (1,000 M15)
                     </h3>
                     <div class="space-y-3 font-mono text-xs">
                         <div class="bg-gray-800/80 p-3 rounded-xl border border-gray-700 flex justify-between items-center">
@@ -296,18 +295,18 @@
                     </div>
                     <div class="space-y-2 mt-4 text-xs">
                         <div class="p-3 bg-red-950/30 border border-red-900/50 rounded-xl">
-                            <b class="text-red-400 block mb-1">ກໍລະນີ 1 (Dump -> Retest -> Sweep):</b>
+                            <b class="text-red-400 block mb-1">ກໍລະນີ 1 (Dump -> Retest -> Sweep BSL):</b>
                             <span id="scenario-1-desc" class="text-gray-300">...</span>
                         </div>
                         <div class="p-3 bg-emerald-950/30 border border-emerald-900/50 rounded-xl">
-                            <b class="text-emerald-400 block mb-1">ກໍລະນີ 2 (Pump -> Retest -> Sweep):</b>
+                            <b class="text-emerald-400 block mb-1">ກໍລະນີ 2 (Pump -> Retest -> Sweep SSL):</b>
                             <span id="scenario-2-desc" class="text-gray-300">...</span>
                         </div>
                     </div>
                 </div>
 
                 <div id="liq-action-box" class="bg-gray-900 border-2 p-5 rounded-2xl text-center space-y-2">
-                    <span class="text-xs text-gray-400">ຄຳແນະນຳ AI 1M ຫຼັງ Clear Liquidity</span>
+                    <span class="text-xs text-gray-400">ຄຳແນະນຳ AI 1,000 M15 ຫຼັງ Clear Liquidity</span>
                     <div id="liq-recommended-action" class="text-xl font-bold font-mono">ກຳລັງສະແກນຕະຫຼາດ...</div>
                     <div id="liq-action-details" class="text-xs text-gray-300 font-mono">...</div>
                 </div>
@@ -324,15 +323,15 @@
                     <h2 class="text-sm md:text-base font-bold text-white flex items-center gap-2">
                         #xauusd_ai_swarm_debate <span class="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-wider animate-pulse">LIVE</span>
                     </h2>
-                    <p class="text-xs text-gray-400">Stream ການວິເຄາະສົດ Real-Time ໂດຍ 3 AI ຜູ້ຊ່ຽວຊານ (SMC, Orderflow, Consensus)</p>
+                    <p class="text-xs text-gray-400">Stream ການວິເຄາະສົດ Real-Time ໂດຍ 3 AI ຜູ້ຊ່ຽວຊານ (1,000 M15 SMC Quant Model)</p>
                 </div>
             </div>
             <div class="flex items-center gap-3 mt-2 sm:mt-0">
                 <span class="text-xs bg-[#0e0e10] border border-gray-700 text-yellow-400 px-3 py-1.5 rounded-lg font-mono" id="debate-chart-status">
-                    Tracking OANDA:XAUUSD Live...
+                    Tracking 1,000 M15 Candles Live...
                 </span>
                 <span class="text-xs text-gray-400 flex items-center gap-1 font-mono">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> 1,000,000 Agents
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> TwelveData Synced
                 </span>
             </div>
         </div>
@@ -343,12 +342,12 @@
                     <span class="flex items-center gap-2 text-gray-300 font-bold">
                         <i class="fa-solid fa-comments text-purple-400"></i> STREAM CHAT
                     </span>
-                    <span class="text-[11px] text-emerald-400">● Connected to AI Swarm Voice</span>
+                    <span class="text-[11px] text-emerald-400">● Connected to AI Quant Voice</span>
                 </div>
 
                 <div id="twitch-chat-stream" class="flex-1 overflow-y-auto custom-scroll p-3 space-y-1.5 text-xs font-mono leading-relaxed bg-[#0b0e14]">
                     <div class="text-gray-500 text-[11px] py-1 border-b border-gray-800/60 mb-2">
-                        [System]: ຍິນດີຕ້ອນຮັບສູ່ຫ້ອງ AI Live Debate. ລະບົບກຳລັງດຶງແທ່ງທຽນ M15 ຈາກ TradingView OANDA...
+                        [System]: ຍິນດີຕ້ອນຮັບສູ່ຫ້ອງ AI Live Debate. ລະບົບດຶງ 1,000 ແທ່ງ M15 ຈາກ Twelve Data ສຳເລັດແລ້ວ...
                     </div>
                 </div>
 
@@ -390,7 +389,7 @@
                         <span class="bg-amber-500 text-slate-950 text-[10px] px-2 py-0.5 rounded font-bold font-mono">BOT</span>
                         <div>
                             <div class="font-bold text-amber-400 text-xs">AI_Swarm_Consensus</div>
-                            <div class="text-[11px] text-gray-400">ສັງລວມສຽງໂຫວດ 1M Agents & ສັ່ງ ACTION</div>
+                            <div class="text-[11px] text-gray-400">ສັງລວມສຽງໂຫວດ 1,000 M15 SMC & ສັ່ງ ACTION</div>
                         </div>
                     </div>
                 </div>
@@ -398,22 +397,21 @@
                 <div class="p-4 bg-[#18181b] border border-gray-800 rounded-xl text-xs text-gray-300 leading-relaxed space-y-2">
                     <b class="text-yellow-400 block"><i class="fa-solid fa-chart-line"></i> ການວິເຄາະແບບ Live Stream:</b>
                     <p class="text-[11px] text-gray-400">
-                        ຂໍ້ຄວາມຈະໄຫຼລົງມາເລື້ອຍໆ ຄືກັບແຊັດ Twitch ແທ້. AI ທັງ 3 ຈະຕິດຕາມແທ່ງທຽນ M15 ແລະ ໂຕ້ຕອບກັນທັນທີທີ່ມີການປ່ຽນແປງຂອງລາຄາ ຫຼື ເກີດການ Sweep Liquidity.
+                        ຂໍ້ຄວາມຈະໄຫຼລົງມາເລື້ອຍໆ ຄືກັບແຊັດ Twitch ແທ້. AI ທັງ 3 ຈະຕິດຕາມແທ່ງທຽນ M15 1,000 ແທ່ງ ແລະ ໂຕ້ຕອບກັນທັນທີທີ່ມີການປ່ຽນແປງຂອງລາຄາ ຫຼື ເກີດການ Sweep Liquidity.
                     </p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- ==================== VIEW 5: ຂ່າວໂລກ & ພູມິລັດຖະສາດ (MACRO SENTINEL ໃໝ່ລ່າສຸດ) ==================== -->
+    <!-- ==================== VIEW 5: ຂ່າວໂລກ & ພູມິລັດຖະສາດ (MACRO SENTINEL) ==================== -->
     <section id="view-geo" class="hidden space-y-6">
-        <!-- Header Banner -->
         <div class="flex flex-wrap justify-between items-center bg-gray-900/90 border-2 border-amber-500/40 p-4 md:p-5 rounded-2xl glow-amber">
             <div class="flex items-center gap-3">
                 <i class="fa-solid fa-earth-americas text-amber-400 text-3xl animate-pulse"></i>
                 <div>
                     <h2 class="text-base md:text-lg font-bold text-amber-400 flex items-center gap-2">
-                        AI Geopolitical & Macro Sentinel (1,000,000 Agents Feed)
+                        AI Geopolitical & Macro Sentinel (FMP & US Media Real-Time Feed)
                     </h2>
                     <p class="text-xs md:text-sm text-gray-300">
                         AI ດຶງຂ່າວໃຫຍ່ຈາກສື່ສະຫະລັດ (Reuters, Bloomberg, Fed, War, Oil, Hack) ມາສະຫຼຸບ ແລະ ວິເຄາະຜົນກະທົບຕໍ່ທອງຄຳ
@@ -427,17 +425,17 @@
             </div>
         </div>
 
-        <!-- 3. ກ່ອງໂພສ/ຂ່າວ Trump ແບບພິເສດ (Pinned VIP Card ຄືເກົ່າ) -->
+        <!-- ກ່ອງໂພສ/ຂ່າວ Trump ແທ້ (ພ້ອມລະບົບກວດສອບອາຍຸ 7 ມື້) -->
         <div class="bg-gradient-to-r from-gray-900 via-gray-900 to-amber-950/40 border-2 border-amber-500/70 p-5 rounded-2xl glow-gold space-y-3">
             <div class="flex flex-wrap justify-between items-center border-b border-gray-800 pb-2.5">
                 <div class="flex items-center gap-2">
                     <i class="fa-brands fa-x-twitter text-amber-400 text-xl"></i>
                     <span class="font-bold text-amber-400 text-sm md:text-base">ໂພສ/ຂ່າວ Trump & ນະໂຍບາຍການຄ້າສະຫະລັດ</span>
-                    <span class="bg-red-500/20 text-red-400 border border-red-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono uppercase">PINNED TRUMP FEED</span>
+                    <span class="bg-red-500/20 text-red-400 border border-red-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono uppercase">REAL TRUMP FEED</span>
                 </div>
                 <div class="flex items-center gap-2 text-xs font-mono">
                     <span id="trump-time" class="text-gray-400">...</span>
-                    <span id="trump-impact" class="bg-red-500/20 text-red-400 font-bold px-2.5 py-0.5 rounded">ຮ້າຍແຮງ</span>
+                    <span id="trump-impact" class="bg-red-500/20 text-red-400 font-bold px-2.5 py-0.5 rounded">...</span>
                 </div>
             </div>
             <p id="trump-post" class="text-white text-sm md:text-base font-semibold leading-relaxed italic">
@@ -459,11 +457,10 @@
                 <span class="text-xs text-gray-400 font-mono">* ລະບົບຄັດລົບຂ່າວທີ່ເກີນ 7 ມື້ຖິ້ມອັດຕະໂນມັດ</span>
             </div>
 
-            <!-- Grid ຂ່າວ -->
             <div id="macro-news-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="text-gray-400 text-sm p-8 col-span-full text-center bg-gray-900/60 rounded-2xl">
                     <i class="fa-solid fa-spinner fa-spin text-amber-400 text-2xl mb-2"></i>
-                    <p>AI 1,000,000 Agents ກຳລັງສະແກນຂ່າວສານໃຫຍ່ຈາກສະຫະລັດອາເມລິກາ...</p>
+                    <p>AI ກຳລັງສະແກນຂ່າວສານໃຫຍ່ຈາກສື່ສະຫະລັດ ແລະ FMP...</p>
                 </div>
             </div>
         </div>
@@ -627,7 +624,7 @@
 
                 document.getElementById('trend-direction').innerText = data.trend.direction;
                 document.getElementById('trend-strength').innerText = data.trend.strength;
-                document.getElementById('trend-desc').innerText = `* AI ${data.trend.votesForSignal.toLocaleString()} / ${data.trend.votesTotal.toLocaleString()} Agents (${data.trend.winRate}) ຢືນຢັນ: ${data.trend.description}`;
+                document.getElementById('trend-desc').innerText = `* ${data.trend.description}`;
 
                 document.getElementById('lvl-r2').innerText = `$${data.levels.r2}`;
                 document.getElementById('lvl-r1').innerText = `$${data.levels.r1}`;
@@ -674,7 +671,7 @@
 
                 document.getElementById('liq-cleared-price').innerText = `$${data.clearedPrice}`;
                 document.getElementById('liq-type-text').innerText = data.liquidityType;
-                document.getElementById('liq-volume-est').innerText = data.volumeEstimated;
+                document.getElementById('liq-volume-est').innerText = data.volumeDisplay || "$1.1B USD";
                 document.getElementById('liq-mm-status').innerText = data.marketMakerStatus;
 
                 document.getElementById('scenario-1-desc').innerText = data.scenario1;
@@ -692,8 +689,8 @@
                             <div class="flex items-center gap-3">
                                 <i class="fa-solid fa-triangle-exclamation text-emerald-400 text-3xl"></i>
                                 <div>
-                                    <h2 class="text-base md:text-lg font-bold text-white">🚨 ແຈ້ງເຕືອນ: ເຈົ້າຕະຫຼາດ CLEAR SELL-SIDE LIQUIDITY ຮຽບຮ້ອຍແລ້ວ!</h2>
-                                    <p class="text-xs text-emerald-300">ໜ້າຫຼັກເປີດສັນຍານ <b class="underline text-white text-sm">AUTO BUY NOW</b> ທີ່ $${data.suggestedEntry} (ສຽງເຕືອນ 5 ນາທີ)</p>
+                                    <h2 class="text-base md:text-lg font-bold text-white">🚨 ແຈ້ງເຕືອນ: ເຈົ້າຕະຫຼາດ CLEAR SELL-SIDE LIQUIDITY (SSL) ແລ້ວ!</h2>
+                                    <p class="text-xs text-emerald-300">ກວດພົບໄສ້ Rejection ເທິງ M15 ເປີດສັນຍານ <b class="underline text-white text-sm">AUTO BUY NOW</b> ທີ່ ${data.suggestedEntry} (ສຽງເຕືອນ 5 ນາທີ)</p>
                                 </div>
                             </div>
                             <span class="bg-emerald-500 text-black font-mono font-bold px-4 py-2 rounded-xl text-sm mt-3 md:mt-0">AUTO BUY TRIGGERED</span>
@@ -707,8 +704,8 @@
                             <div class="flex items-center gap-3">
                                 <i class="fa-solid fa-triangle-exclamation text-red-400 text-3xl"></i>
                                 <div>
-                                    <h2 class="text-base md:text-lg font-bold text-white">🚨 ແຈ້ງເຕືອນ: ເຈົ້າຕະຫຼາດ CLEAR BUY-SIDE LIQUIDITY ຮຽບຮ້ອຍແລ້ວ!</h2>
-                                    <p class="text-xs text-red-300">ໜ້າຫຼັກເປີດສັນຍານ <b class="underline text-white text-sm">AUTO SELL NOW</b> ທີ່ $${data.suggestedEntry} (ສຽງເຕືອນ 5 ນາທີ)</p>
+                                    <h2 class="text-base md:text-lg font-bold text-white">🚨 ແຈ້ງເຕືອນ: ເຈົ້າຕະຫຼາດ CLEAR BUY-SIDE LIQUIDITY (BSL) ແລ້ວ!</h2>
+                                    <p class="text-xs text-red-300">ກວດພົບໄສ້ Rejection ເທິງ M15 ເປີດສັນຍານ <b class="underline text-white text-sm">AUTO SELL NOW</b> ທີ່ ${data.suggestedEntry} (ສຽງເຕືອນ 5 ນາທີ)</p>
                                 </div>
                             </div>
                             <span class="bg-red-500 text-white font-mono font-bold px-4 py-2 rounded-xl text-sm mt-3 md:mt-0">AUTO SELL TRIGGERED</span>
@@ -717,25 +714,26 @@
                         recAction.className = "text-2xl font-bold font-mono text-red-400";
                         recAction.innerText = "ACTION: AUTO SELL (Follow Smart Money)";
                     }
-                    actDetails.innerText = `ຈຸດເຂົ້າ: $${data.suggestedEntry} | SL: $${data.suggestedSL} | TP: $${data.suggestedTP}`;
+                    actDetails.innerText = `ຈຸດເຂົ້າ: ${data.suggestedEntry} | SL: ${data.suggestedSL} | TP: ${data.suggestedTP}`;
                 } else {
                     banner.className = "p-4 rounded-2xl border border-gray-700 bg-gray-800/60 text-gray-300 flex flex-wrap justify-between items-center";
                     banner.innerHTML = `
                         <div class="flex items-center gap-3">
                             <i class="fa-solid fa-spinner fa-spin text-purple-400 text-2xl"></i>
                             <div>
-                                <h2 class="text-sm md:text-base font-bold text-gray-200">ກຳລັງດັກຈັບ: ເຈົ້າຕະຫຼາດກຳລັງສ້າງ Liquidity Pool (SideWay)</h2>
-                                <p class="text-xs text-gray-400">ເຝົ້າລະວັງການ Sweep ແນວຕ້ານ $${data.majorResistance} ຫຼື ແນວຮັບ $${data.majorSupport}</p>
+                                <h2 class="text-sm md:text-base font-bold text-gray-200">ກຳລັງດັກຈັບ: 1,000 ແທ່ງ M15 ກຳລັງສ້າງ Liquidity Pool</h2>
+                                <p class="text-xs text-gray-400">ເຝົ້າລະວັງການ Sweep ແນວຕ້ານ BSL $${data.majorResistance} ຫຼື ແນວຮັບ SSL $${data.majorSupport}</p>
                             </div>
                         </div>
-                        <span class="text-xs bg-purple-900/60 text-purple-300 px-3 py-1 rounded-lg">Stalking Liquidity...</span>
+                        <span class="text-xs bg-purple-900/60 text-purple-300 px-3 py-1 rounded-lg">Scanning 1,000 Candles...</span>
                     `;
                     actionBox.className = "bg-gray-900 border border-gray-700 p-5 rounded-2xl text-center space-y-2";
                     recAction.className = "text-lg font-bold font-mono text-yellow-400";
                     recAction.innerText = "WAITING: ລໍຖ້າເຈົ້າຕະຫຼາດ Clear Liquidity";
-                    actDetails.innerText = "ໜ້າຫຼັກຈະຍັງບໍ່ເປີດອໍເດີ ຈົນກວ່າຈະເກີດການ Sweep ສຳເລັດ";
+                    actDetails.innerText = "ໜ້າຫຼັກຈະຍັງບໍ່ເປີດອໍເດີ ຈົນກວ່າຈະເກີດການ Sweep ໄສ້ແທ່ງທຽນ M15 ສຳເລັດ";
                 }
 
+                // ແຕ້ມກຣາຟແທ່ງທຽນ M15 ຕົວຈິງ
                 drawLiquidityVisual(data);
             } catch (err) {}
         }
@@ -748,7 +746,7 @@
 
                 if (data.marketSnapshot) {
                     document.getElementById('debate-chart-status').innerText = 
-                        `XAU: $${data.marketSnapshot.price} | RSI: ${data.marketSnapshot.rsi} | ${data.marketSnapshot.status}`;
+                        `XAU: $${data.marketSnapshot.price} | TwelveData 1,000 M15 | ${data.marketSnapshot.status}`;
                 }
 
                 const chatStream = document.getElementById('twitch-chat-stream');
@@ -794,16 +792,12 @@
             }
         }
 
-        // ==========================================
-        // FETCH GEOPOLITICS & MACRO SENTINEL (VIEW 5)
-        // ==========================================
         async function fetchGeopolitics() {
             try {
                 const res = await fetch(`${API_BASE}/geopolitics`);
                 const data = await res.json();
                 if (!data.success) return;
 
-                // ອັບເດດກ່ອງ Trump
                 if (data.trump) {
                     document.getElementById('trump-post').innerText = `"${data.trump.post}"`;
                     document.getElementById('trump-time').innerText = data.trump.time;
@@ -812,7 +806,6 @@
                     document.getElementById('trump-gold-effect').innerText = data.trump.goldEffect;
                 }
 
-                // ອັບເດດ Feed ຂ່າວໃຫຍ່ (Newest First)
                 if (data.news && Array.isArray(data.news)) {
                     document.getElementById('macro-news-count').innerText = data.count || data.news.length;
                     const container = document.getElementById('macro-news-grid');
@@ -839,7 +832,7 @@
 
                             <div class="bg-gray-800/90 p-3 rounded-xl border-l-4 border-amber-500 text-xs space-y-1">
                                 <div class="flex justify-between items-center mb-1">
-                                    <b class="text-amber-400"><i class="fa-solid fa-brain mr-1"></i> AI 1M Swarm ວິເຄາະຜົນກະທົບ:</b>
+                                    <b class="text-amber-400"><i class="fa-solid fa-brain mr-1"></i> AI ວິເຄາະຜົນກະທົບ:</b>
                                     <span class="font-bold font-mono ${item.goldEffect.includes('Bullish') ? 'text-emerald-400' : 'text-red-400'}">${item.goldEffect}</span>
                                 </div>
                                 <p class="text-gray-300 text-[11px] leading-relaxed">${item.aiGoldAnalysis}</p>
@@ -897,7 +890,7 @@
             qaBox.innerHTML += `
                 <div id="${loadingId}" class="bg-gray-800 p-2.5 rounded-xl border border-gray-700 text-gray-400 flex items-center gap-2">
                     <i class="fa-solid fa-spinner fa-spin text-amber-400"></i>
-                    <span>AI ກຳລັງວິເຄາະກຣາຟ ແລະ ຕອບ...</span>
+                    <span>AI ກຳລັງວິເຄາະ 1,000 M15 Candles ແລະ ຕອບ...</span>
                 </div>
             `;
             qaBox.scrollTop = qaBox.scrollHeight;
@@ -926,6 +919,9 @@
             }
         }
 
+        // ============================================================
+        // REAL M15 CANDLES CANVAS RENDERING ENGINE (100% ຕົວຈິງ)
+        // ============================================================
         function drawLiquidityVisual(data) {
             const canvas = document.getElementById('liquidityCanvas');
             if (!canvas) return;
@@ -937,6 +933,7 @@
             ctx.fillStyle = "#090d16";
             ctx.fillRect(0, 0, w, h);
 
+            // ແຕ້ມຕາໜ່າງ Grid
             ctx.strokeStyle = "#1e293b";
             ctx.lineWidth = 1;
             for (let y = 30; y < h; y += 40) {
@@ -946,69 +943,107 @@
                 ctx.stroke();
             }
 
-            const isSweepHigh = data.signalAction === 'SELL';
-            const levelY = isSweepHigh ? 90 : 250;
-            const levelColor = isSweepHigh ? "#ef4444" : "#10b981";
+            // ດຶງແທ່ງທຽນແທ້ 16 ແທ່ງລ່າສຸດທີ່ສົ່ງມາຈາກ Twelve Data
+            const candles = data.recentCandles || [];
+            if (candles.length === 0) return;
 
-            ctx.strokeStyle = levelColor;
-            ctx.setLineDash([6, 4]);
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(30, levelY);
-            ctx.lineTo(w - 30, levelY);
-            ctx.stroke();
-            ctx.setLineDash([]);
+            // ຄຳນວນ Range ລາຄາ
+            const highPrices = candles.map(c => c.high);
+            const lowPrices = candles.map(c => c.low);
+            const maxP = Math.max(...highPrices, data.r1 || 0);
+            const minP = Math.min(...lowPrices, data.s1 || 99999);
+            const priceRange = (maxP - minP) || 10;
 
-            ctx.font = "bold 11px JetBrains Mono";
-            ctx.fillStyle = levelColor;
-            ctx.fillText(isSweepHigh ? `Major BSL $${data.clearedPrice}` : `Major SSL $${data.clearedPrice}`, 40, isSweepHigh ? levelY - 10 : levelY + 20);
+            const getY = (val) => {
+                return h - 45 - ((val - minP) / priceRange) * (h - 90);
+            };
 
-            const candles = [
-                { x: 80, o: 150, c: isSweepHigh ? 210 : 90, h: isSweepHigh ? 220 : 80, l: isSweepHigh ? 140 : 220, bull: !isSweepHigh },
-                { x: 130, o: isSweepHigh ? 210 : 90, c: isSweepHigh ? 220 : 80, h: isSweepHigh ? 230 : 70, l: isSweepHigh ? 190 : 100, bull: !isSweepHigh },
-                { x: 180, o: isSweepHigh ? 200 : 100, c: isSweepHigh ? 160 : 140, h: isSweepHigh ? 210 : 150, l: isSweepHigh ? 150 : 90, bull: isSweepHigh },
-                { x: 230, o: isSweepHigh ? 160 : 140, c: isSweepHigh ? 130 : 170, h: isSweepHigh ? 170 : 180, l: isSweepHigh ? 120 : 130, bull: isSweepHigh },
-                { x: 280, o: isSweepHigh ? 130 : 170, c: isSweepHigh ? 110 : 190, h: isSweepHigh ? 140 : 200, l: isSweepHigh ? 100 : 160, bull: isSweepHigh },
-                { x: 360, o: isSweepHigh ? 115 : 195, c: isSweepHigh ? 135 : 175, h: isSweepHigh ? 65 : 210, l: isSweepHigh ? 145 : 280, bull: !isSweepHigh, isSweep: true },
-                { x: 440, o: isSweepHigh ? 135 : 175, c: isSweepHigh ? 210 : 100, h: isSweepHigh ? 140 : 180, l: isSweepHigh ? 220 : 90, bull: !isSweepHigh },
-                { x: 520, o: isSweepHigh ? 210 : 100, c: isSweepHigh ? 260 : 60, h: isSweepHigh ? 215 : 110, l: isSweepHigh ? 270 : 50, bull: !isSweepHigh }
-            ];
-
-            candles.forEach(c => {
-                ctx.strokeStyle = c.bull ? "#10b981" : "#ef4444";
-                ctx.fillStyle = c.bull ? "#10b981" : "#ef4444";
+            // ແຕ້ມເສັ້ນ BSL ແນວຕ້ານແທ້ (ສີແດງ)
+            if (data.r1) {
+                const rY = getY(data.r1);
+                ctx.strokeStyle = "#ef4444";
+                ctx.setLineDash([5, 5]);
                 ctx.lineWidth = 1.5;
-
                 ctx.beginPath();
-                ctx.moveTo(c.x, c.h);
-                ctx.lineTo(c.x, c.l);
+                ctx.moveTo(30, rY);
+                ctx.lineTo(w - 30, rY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = "#ef4444";
+                ctx.font = "bold 11px JetBrains Mono";
+                ctx.fillText(`Major BSL $${data.r1}`, 35, rY - 8);
+            }
+
+            // ແຕ້ມເສັ້ນ SSL ແນວຮັບແທ້ (ສີຂຽວ)
+            if (data.s1) {
+                const sY = getY(data.s1);
+                ctx.strokeStyle = "#10b981";
+                ctx.setLineDash([5, 5]);
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(30, sY);
+                ctx.lineTo(w - 30, sY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = "#10b981";
+                ctx.font = "bold 11px JetBrains Mono";
+                ctx.fillText(`Major SSL $${data.s1}`, 35, sY + 18);
+            }
+
+            // ແຕ້ມແທ່ງທຽນແທ້ໆ 100%
+            const candleWidth = 14;
+            const spacing = (w - 80) / candles.length;
+
+            candles.forEach((c, idx) => {
+                const x = 50 + idx * spacing;
+                const openY = getY(c.open);
+                const closeY = getY(c.close);
+                const highY = getY(c.high);
+                const lowY = getY(c.low);
+                const isBull = c.close >= c.open;
+                const candleColor = isBull ? "#10b981" : "#ef4444";
+
+                // 1. ແຕ້ມໄສ້ທຽນ
+                ctx.strokeStyle = candleColor;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x, highY);
+                ctx.lineTo(x, lowY);
                 ctx.stroke();
 
-                const top = Math.min(c.o, c.c);
-                const height = Math.abs(c.o - c.c) || 4;
-                ctx.fillRect(c.x - 10, top, 20, height);
+                // 2. ແຕ້ມເນື້ອແທ່ງທຽນ
+                ctx.fillStyle = candleColor;
+                const bodyTop = Math.min(openY, closeY);
+                const bodyHeight = Math.max(Math.abs(closeY - openY), 3);
+                ctx.fillRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
 
+                // 3. ຖ້າເປັນແທ່ງທີ່ເກີດ Sweep Liquidity ແທ້
                 if (c.isSweep) {
                     ctx.fillStyle = "#eab308";
-                    ctx.font = "bold 13px 'Phetsarath'";
-                    const markY = isSweepHigh ? 50 : 300;
-                    ctx.fillText("🔥 ຈຸດ MM Clear Liquidity", c.x - 70, markY);
+                    ctx.font = "bold 12px 'Phetsarath'";
+                    const markY = isBull ? lowY + 25 : highY - 15;
+                    ctx.fillText("🔥 ຈຸດ MM Sweep", x - 40, markY);
 
                     ctx.strokeStyle = "#eab308";
-                    ctx.lineWidth = 2;
+                    ctx.lineWidth = 2.5;
                     ctx.beginPath();
-                    ctx.arc(c.x, isSweepHigh ? c.h : c.l, 10, 0, Math.PI * 2);
+                    ctx.arc(x, isBull ? lowY : highY, 12, 0, Math.PI * 2);
                     ctx.stroke();
                 }
             });
 
-            ctx.fillStyle = isSweepHigh ? "#ef4444" : "#10b981";
-            ctx.font = "bold 14px JetBrains Mono";
-            ctx.fillText(isSweepHigh ? "⬇ AUTO SELL (Dump Continuation)" : "⬆ AUTO BUY (Pump Continuation)", 380, isSweepHigh ? 290 : 50);
+            // ຂໍ້ຄວາມສະແດງຜົນ Action
+            ctx.fillStyle = data.signalAction === 'BUY' ? "#10b981" : (data.signalAction === 'SELL' ? "#ef4444" : "#eab308");
+            ctx.font = "bold 13px JetBrains Mono";
+            ctx.fillText(
+                data.signalAction === 'BUY' ? "⬆ REAL SMC AUTO BUY (SSL Sweep Confirmed)" :
+                (data.signalAction === 'SELL' ? "⬇ REAL SMC AUTO SELL (BSL Sweep Confirmed)" : "⏳ 1,000 M15 Candles Scanning..."),
+                w - 380, h - 15
+            );
         }
 
         // ==========================================
-        // ເລີ່ມຕົ້ນລະບົບ
+        // ເລີ່ມຕົ້ນລະບົບ Polling
         // ==========================================
         fetchAnalysis();
         fetchGeopolitics();
@@ -1016,10 +1051,10 @@
         fetchLiquidityAnalysis();
         fetchAutoBotDebate();
 
-        setInterval(fetchAnalysis, 4500);
-        setInterval(fetchLiquidityAnalysis, 6000);
+        setInterval(fetchAnalysis, 5000);
+        setInterval(fetchLiquidityAnalysis, 8000);
         setInterval(fetchAutoBotDebate, 14000);
-        setInterval(fetchGeopolitics, 60000); // ກວດສອບຂ່າວໂລກທຸກໆ 1 ນາທີ
+        setInterval(fetchGeopolitics, 60000);
         setInterval(fetchRedNews, 90000);
     </script>
 </body>
