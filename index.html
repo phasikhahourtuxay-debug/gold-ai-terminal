@@ -182,7 +182,7 @@
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-bolt text-yellow-400 text-lg"></i>
                         <h3 class="text-base md:text-lg font-bold text-yellow-400">
-                            ຄຳແນະນຳໃນການຊື້-ຂາຍ (4 SMC Setups - Reset 20m)
+                            ຄຳແນະນຳໃນການຊື້-ຂາຍ (4 SMC Setups - Reset 2h)
                         </h3>
                     </div>
                     <div class="flex items-center gap-2">
@@ -201,7 +201,7 @@
                     <div class="bg-gray-800 p-2.5 rounded-xl border border-emerald-900/60"><span class="text-emerald-400 block text-xs">TP 5</span><span id="sig-tp5" class="text-emerald-300 font-bold text-sm">...</span></div>
                     <div class="bg-gray-800 p-2.5 rounded-xl border border-red-900/60"><span class="text-red-400 block text-xs">SL</span><span id="sig-sl" class="text-red-400 font-bold text-sm">...</span></div>
                 </div>
-                <p class="text-[11px] text-gray-400 text-center mt-3">* ໝາຍເຫດ: ລະບົບກວດສອບ Inducement ແລ້ວ ພ້ອມ Reset ອັດຕະໂນມັດຫຼັງຈາກຜ່ານໄປ 20 ນาที</p>
+                <p class="text-[11px] text-gray-400 text-center mt-3">* ໝາຍເຫດ: ລະບົບກວດສອບ Inducement ແລ້ວ ພ້ອມ Reset ອັດຕະໂນມັດຫຼັງຈາກຜ່ານໄປ 2 ຊົ່ວໂມງ</p>
             </div>
         </div>
 
@@ -274,7 +274,7 @@
             <div class="lg:col-span-5 space-y-6">
                 <div class="bg-gray-900 border border-gray-800 p-5 rounded-2xl space-y-4">
                     <h3 class="text-sm md:text-base font-bold text-purple-400 flex items-center gap-2 border-b border-gray-800 pb-3">
-                        <i class="fa-solid fa-fingerprint"></i> ຕົວເລກທີ່ເຈົ້າຕະຫຼາດ Clear Liquidity (Reset 10m)
+                        <i class="fa-solid fa-fingerprint"></i> ຕົວເລກທີ່ເຈົ້າຕະຫຼາດ Clear Liquidity (Reset 2h)
                     </h3>
                     <div class="space-y-3 font-mono text-xs">
                         <div class="bg-gray-800/80 p-3 rounded-xl border border-gray-700 flex justify-between items-center">
@@ -297,7 +297,7 @@
                 </div>
 
                 <div id="liq-action-box" class="bg-gray-900 border-2 p-5 rounded-2xl text-center space-y-2">
-                    <span class="text-xs text-gray-400">ຄຳແນະນຳ AI ຫຼັງ Clear Liquidity (Reset 10m)</span>
+                    <span class="text-xs text-gray-400">ຄຳແນະນຳ AI ຫຼັງ Clear Liquidity (Reset 2h)</span>
                     <div id="liq-recommended-action" class="text-xl font-bold font-mono">ກຳລັງຊອກຫາ Liquidity ໃໝ່...</div>
                     <div id="liq-action-details" class="text-xs text-gray-300 font-mono">...</div>
                 </div>
@@ -369,7 +369,7 @@
                         <span class="bg-amber-500 text-slate-950 text-[10px] px-2 py-0.5 rounded font-bold font-mono">BOT</span>
                         <div>
                             <div class="font-bold text-amber-400 text-xs">AI_Swarm_Consensus</div>
-                            <div class="text-[11px] text-gray-400">ສັງລວມ 4 SMC Setups & Reset 20m</div>
+                            <div class="text-[11px] text-gray-400">ສັງລວມ 4 SMC Setups & Reset 2h</div>
                         </div>
                     </div>
                 </div>
@@ -572,12 +572,12 @@
                 if (data.signal.type === 'BUY') {
                     sigCard.className = "bg-gray-900 border-2 border-emerald-500 p-5 rounded-2xl shadow-lg shadow-emerald-950/50";
                     sigBadge.className = "bg-emerald-500 text-black text-xs md:text-sm font-bold px-4 py-1.5 rounded-full animate-bounce";
-                    sigBadge.innerHTML = `<i class="fa-solid fa-arrow-trend-up mr-1"></i> AUTO SIGNAL: BUY (20m)`;
+                    sigBadge.innerHTML = `<i class="fa-solid fa-arrow-trend-up mr-1"></i> AUTO SIGNAL: BUY (2h)`;
                     start5MinuteAlertSound(data.signal.signalId);
                 } else if (data.signal.type === 'SELL') {
                     sigCard.className = "bg-gray-900 border-2 border-red-500 p-5 rounded-2xl shadow-lg shadow-red-950/50";
                     sigBadge.className = "bg-red-500 text-white text-xs md:text-sm font-bold px-4 py-1.5 rounded-full animate-bounce";
-                    sigBadge.innerHTML = `<i class="fa-solid fa-arrow-trend-down mr-1"></i> AUTO SIGNAL: SELL (20m)`;
+                    sigBadge.innerHTML = `<i class="fa-solid fa-arrow-trend-down mr-1"></i> AUTO SIGNAL: SELL (2h)`;
                     start5MinuteAlertSound(data.signal.signalId);
                 } else {
                     sigCard.className = "bg-gray-900 border-2 border-yellow-500/40 p-5 rounded-2xl glow-gold";
