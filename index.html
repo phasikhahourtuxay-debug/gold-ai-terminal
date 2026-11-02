@@ -201,7 +201,7 @@
                     <div class="bg-gray-800 p-2.5 rounded-xl border border-emerald-900/60"><span class="text-emerald-400 block text-xs">TP 5</span><span id="sig-tp5" class="text-emerald-300 font-bold text-sm">...</span></div>
                     <div class="bg-gray-800 p-2.5 rounded-xl border border-red-900/60"><span class="text-red-400 block text-xs">SL</span><span id="sig-sl" class="text-red-400 font-bold text-sm">...</span></div>
                 </div>
-                <p class="text-[11px] text-gray-400 text-center mt-3">* ໝາຍເຫດ: ລະບົບກວດສອບ Inducement ແລ້ວ ພ້ອມ Reset ອັດຕະໂນມັດຫຼັງຈາກຜ່ານໄປ 20 ນາທີ</p>
+                <p class="text-[11px] text-gray-400 text-center mt-3">* ໝາຍເຫດ: ລະບົບກວດສອບ Inducement ແລ້ວ ພ້ອມ Reset ອັດຕະໂນມັດຫຼັງຈາກຜ່ານໄປ 20 ນาที</p>
             </div>
         </div>
 
@@ -546,14 +546,12 @@
         setInterval(updateAsiaClock, 1000);
         updateAsiaClock();
 
-        // ໂຫຼດສັນຍານໜ້າຫຼັກ (4 SMC Setups)
         async function fetchAnalysis() {
             try {
                 const res = await fetch(`${API_BASE}/analysis`);
                 const data = await res.json();
                 if (!data.success) return;
 
-                // Sync ລາຄາໄປຍັງແຖບຫ້ອງຖົກຖຽງທັນທີ
                 const debateStatusEl = document.getElementById('debate-chart-status');
                 if (debateStatusEl) {
                     debateStatusEl.innerText = `XAU: $${data.currentPrice} | RSI: ${data.rsi} | ${data.htfTrend}`;
@@ -598,7 +596,6 @@
             } catch (err) {}
         }
 
-        // ໂຫຼດ Liquidity Hunter
         async function fetchLiquidityAnalysis() {
             try {
                 const res = await fetch(`${API_BASE}/liquidity-hunt`);
@@ -643,7 +640,6 @@
             } catch (err) {}
         }
 
-        // ແຕ້ມ Canvas ແທ່ງທຽນ
         function drawLiquidityVisual(data) {
             const canvas = document.getElementById('liquidityCanvas');
             if (!canvas) return;
@@ -715,7 +711,6 @@
             });
         }
 
-        // Live Debate (ອັບເດດຂໍ້ຄວາມທຸກໆ 1 ນາທີ)
         async function fetchAutoBotDebate() {
             try {
                 const res = await fetch(`${API_BASE}/swarm-live-debate`);
@@ -744,7 +739,6 @@
             document.getElementById('twitch-chat-stream').innerHTML = `<div class="text-gray-500 text-[11px] py-1">[System]: ລຶບປະຫວັດແຊັດແລ້ວ.</div>`;
         }
 
-        // ຂ່າວ Geopolitics & Trump
         async function fetchGeopolitics() {
             try {
                 const res = await fetch(`${API_BASE}/geopolitics`);
@@ -775,7 +769,6 @@
             } catch (err) {}
         }
 
-        // ຂ່າວສີແດງ USD
         async function fetchRedNews() {
             try {
                 const res = await fetch(`${API_BASE}/red-news`);
@@ -793,7 +786,6 @@
             } catch (err) {}
         }
 
-        // Chat Form Submit
         async function handleUserChatSubmit(e) {
             e.preventDefault();
             const input = document.getElementById('chat-input');
@@ -815,19 +807,16 @@
             qaBox.scrollTop = qaBox.scrollHeight;
         }
 
-        // ==========================================
-        // RUNTIME LOOPS
-        // ==========================================
         fetchAnalysis();
         fetchGeopolitics();
         fetchRedNews();
         fetchLiquidityAnalysis();
         fetchAutoBotDebate();
 
-        setInterval(fetchAnalysis, 4000);              // ອັບເດດລາຄາທຸກໆ 4 ວິນາທີ
-        setInterval(fetchLiquidityAnalysis, 6000);     // ອັບເດດ Liquidity ທຸກໆ 6 ວິນາທີ
-        setInterval(fetchAutoBotDebate, 60000);        // 🔥 ຕັ້ງເປັນ 60,000ms = 1 ນາທີຕໍ່ 1 ຮອບ
-        setInterval(fetchGeopolitics, 60000);          // ອັບເດດຂ່າວໂລກທຸກໆ 1 ນາທີ
+        setInterval(fetchAnalysis, 4000);
+        setInterval(fetchLiquidityAnalysis, 6000);
+        setInterval(fetchAutoBotDebate, 60000);
+        setInterval(fetchGeopolitics, 60000);
     </script>
 </body>
 </html>
