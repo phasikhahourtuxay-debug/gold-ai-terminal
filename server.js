@@ -12,6 +12,33 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
 // ============================================================
+// ຕັ້ງຄ່າ DISCORD WEBHOOK (ປ່ຽນ URL ຂອງທ່ານທີ່ນີ້)
+// ============================================================
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || "ໃສ່_Discord_Webhook_URL_ຂອງທ່ານທີ່ນີ້";
+
+async function sendDiscordAlert(signalType, entryPrice, tp5, sl) {
+  if (!DISCORD_WEBHOOK_URL || DISCORD_WEBHOOK_URL.includes("ໃສ່_Discord")) return;
+  try {
+    const color = signalType === 'BUY' ? 3066993 : 15158332; // เขียว ຫຼື ແດງ
+    const payload = {
+      embeds: [{
+        title: `🚨 ລະບົບແຈ້ງເຕືອນ SMC SIGNAL: ${signalType}`,
+        color: color,
+        fields: [
+          { name: "💰 ລາຄາເຂົ້າ (Entry)", value: `$${entryPrice}`, inline: true },
+          { name: "🛡️ Stop Loss (SL)", value: `$${sl}`, inline: true },
+          { name: "🎯 ເປົ້າໝາຍ (TP 5)", value: `$${tp5}`, inline: true }
+        ],
+        timestamp: new Date().toISOString()
+      }]
+    };
+    await axios.post(DISCORD_WEBHOOK_URL, payload);
+  } catch (err) {
+    console.log("[Discord Webhook] Error:", err.message);
+  }
+}
+
+// ============================================================
 // ຕັ້ງຄ່າ SMART CACHE
 // ============================================================
 const LIVE_PRICE_CACHE_MS = 150 * 1000;          // 2.5 ນາທີ
@@ -109,7 +136,7 @@ function calculateRSI(closes, period = 14) {
       avgLoss = (avgLoss * (period - 1)) / period;
     } else {
       avgGain = (avgGain * (period - 1)) / period;
-      avgLoss = (avgGain * (period - 1) + Math.abs(diff)) / period;
+      avgLoss = (avgLoss * (period - 1) + Math.abs(diff)) / period;
     }
   }
 
@@ -419,6 +446,9 @@ async function processTradingLogic() {
       signalAction: sigType,
       clearedAt: now
     };
+
+    // ส่งแจ้งเตືອນເຂົ້າ Discord Webhook ທີ່ສ້າງຂຶ້ນ
+    await sendDiscordAlert(sigType, entryPrice.toFixed(2), persistentSignal.tp5, persistentSignal.sl);
   }
 
   return {
@@ -543,7 +573,7 @@ async function fetchRealGeopoliticsAndTrump() {
       count: 2,
       trump: trumpData,
       news: [
-        { category: "Fed & Interest Rate", title: "ເຈົ້າໜ້າที่ Fed ສົ່ງສັນຍານຄົງອັດຕາດອກເບ້ຍສູງ", summary: "ຕະຫຼາດຈັບຕາທ່າທີຂອງ Fed ກ່ຽວກັບການປັບຫຼຸດດອກເບ້ຍ", aiGoldAnalysis: "ດອກເບ້ຍສູງກົດດັນຄຳໄລຍະສັ້ນ", time: currentDateStr },
+        { category: "Fed & Interest Rate", title: "ເຈົ້າໜ້າທີ່ Fed ສົ່ງສັນຍານຄົງອັດຕາດອກເບ້ຍສູງ", summary: "ຕະຫຼາດຈັບຕາທ່າທີຂອງ Fed ກ່ຽວກັບການປັບຫຼຸດດອກເບ້ຍ", aiGoldAnalysis: "ດອກເບ້ຍສູງກົດດັນຄຳໄລຍະສັ້ນ", time: currentDateStr },
         { category: "Geopolitics", title: "ຄວາມເຄັ່ງຕຶງດ້ານພູມິລັດຖະສາດ ແລະ ສົງຄາມການຄ້າ", summary: "ສະຖານະການຕາເວັນອອກກາງ ແລະ ນະໂຍບາຍພາສີໃໝ່", aiGoldAnalysis: "ສະໜັບສະໜູນແຮງຊື້ຄຳ Safe-Haven (Bullish 🚀)", time: currentDateStr }
       ]
     };
@@ -653,6 +683,6 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`====================================================`);
   console.log(`[OK] Gold AI Swarm Terminal RUNNING on port ${PORT}`);
-  console.log(`[OK] Tri-Brain AI (Groq + Gemini + OpenRouter) Active`);
+  console.log(`[OK] Tri-Brain AI & Discord Webhook Integrated`);
   console.log(`====================================================`);
 });
