@@ -19,6 +19,8 @@ const D1_CACHE_MS         = 7 * 24 * 3600 * 1000;// 7 ມື້ (1 ອາທິ�
 const H4_CACHE_MS         = 24 * 3600 * 1000;    // 24 ຊົ່ວໂມງ (1 ມື້ດຶງ 1 ຄັ້ງ)
 const H1_CACHE_MS         = 24 * 3600 * 1000;    // 24 ຊົ່ວໂມງ (1 ມື້ດຶງ 1 ຄັ້ງ)
 const M15_CACHE_MS        = 15 * 60 * 1000;      // 15 ນາທີ (96 calls/ມື້ ຕາມແທ່ງ M15 ປິດ)
+const NEWS_CACHE_MS       = 15 * 60 * 1000;      // Cache ຂ່າວໄວ້ 15 ນາທີ ບໍ່ໃຫ້ເປືອງ AI
+const SEVEN_DAYS_MS       = 7 * 24 * 3600 * 1000;// 7 ມື້ສຳລັບ Auto-Purge
 
 // ============================================================
 // 1. TRI-BRAIN AI CLIENTS (Groq + Gemini + OpenRouter)
@@ -139,8 +141,6 @@ let lastLiveFetch = 0;
 
 async function getLivePriceFeed() {
   const now = Date.now();
-
-  // ຖ້າຍັງບໍ່ຮອດ 2.5 ນາທີ ໃຫ້ສົ່ງຄ່າເກົ່າທັນທີ (ບໍ່ຍິງ API)
   if (cachedLiveFeed && (now - lastLiveFetch < LIVE_PRICE_CACHE_MS) && cachedLiveFeed.price > 1000) {
     return cachedLiveFeed;
   }
@@ -149,7 +149,6 @@ async function getLivePriceFeed() {
   let rsi = cachedLiveFeed?.rsi || 50.0;
   let atr = cachedLiveFeed?.atr || 14.0;
 
-  // ⭐️ ຕົວຫຼັກ 100%: Twelve Data API Spot Gold
   const tdKey = (process.env.TWELVE_DATA_API_KEY || "").trim();
   if (tdKey) {
     try {
@@ -163,7 +162,6 @@ async function getLivePriceFeed() {
     }
   }
 
-  // 🚨 ຕົວສຳຮອງສຸກເສີນ 1: GoldPrice.org
   if (!price || price < 1500) {
     try {
       const gpRes = await axios.get('https://data-asg.goldprice.org/dbXRates/USD', { timeout: 3000 });
@@ -173,7 +171,6 @@ async function getLivePriceFeed() {
     } catch (e) {}
   }
 
-  // 🚨 ຕົວສຳຮອງສຸກເສີນ 2: Yahoo Finance
   if (!price || price < 1500) {
     try {
       const yRes = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=15m&range=1d', {
@@ -208,7 +205,6 @@ async function fetchCandlesFromTwelveData(interval, count) {
   if (!tdKey) return null;
 
   try {
-    // ແມັບ Timeframe ໃຫ້ກົງກັບ Twelve Data
     const tdIntervalMap = { '1day': '1day', '4h': '4h', '1h': '1h', '15min': '15min' };
     const tdInt = tdIntervalMap[interval] || '15min';
 
@@ -216,7 +212,6 @@ async function fetchCandlesFromTwelveData(interval, count) {
     const res = await axios.get(url, { timeout: 6000 });
 
     if (res.data && res.data.status === 'ok' && Array.isArray(res.data.values) && res.data.values.length > 0) {
-      // Twelve Data ສົ່ງແທ່ງໃໝ່ສຸດມາກ່ອນ (Descending), ສະນັ້ນຕ້ອງ .reverse() ເພື່ອໃຫ້ລຽງຈາກອະດີດ -> ປັດຈຸບັນ
       const candles = res.data.values.reverse().map(v => ({
         time: v.datetime,
         open: parseFloat(v.open),
@@ -233,7 +228,6 @@ async function fetchCandlesFromTwelveData(interval, count) {
 }
 
 async function fetchCandlesFallback(interval, count) {
-  // ສຳຮອງ 1: Yahoo Finance
   try {
     const yahooIntervalMap = { '1day': '1d', '4h': '1h', '1h': '1h', '15min': '15m' };
     const yInt = yahooIntervalMap[interval] || '15m';
@@ -261,7 +255,6 @@ async function fetchCandlesFallback(interval, count) {
     }
   } catch (e) {}
 
-  // ສຳຮອງ 2: Binance PAXGUSDT
   try {
     const binanceIntervalMap = { '1day': '1d', '4h': '4h', '1h': '1h', '15min': '15m' };
     const bInterval = binanceIntervalMap[interval] || '15m';
@@ -282,56 +275,32 @@ async function fetchCandlesFallback(interval, count) {
 }
 
 async function fetchCandles(interval, count) {
-  // ດຶງ Twelve Data ເປັນຫຼັກກ່ອນ
   const tdCandles = await fetchCandlesFromTwelveData(interval, count);
-  if (tdCandles && tdCandles.length > 0) {
-    return tdCandles;
-  }
-  // ຖ້າ Twelve Data ມີບັນຫາ ຈຶ່ງໃຊ້ຕົວສຳຮອງ
+  if (tdCandles && tdCandles.length > 0) return tdCandles;
   return await fetchCandlesFallback(interval, count);
 }
 
 async function getMultiTimeframeCandles() {
   const now = Date.now();
 
-  // D1: ດຶງ 1 ຄັ້ງຕໍ່ອາທິດ (7 ມື້)
   if (!cacheD1.data.length || (now - cacheD1.lastFetch > D1_CACHE_MS)) {
     const d1 = await fetchCandles('1day', 22);
-    if (d1.length) { 
-      cacheD1.data = d1; 
-      cacheD1.lastFetch = now; 
-      console.log("[Twelve Data Sync] D1 Candles Cached (7 Days)"); 
-    }
+    if (d1.length) { cacheD1.data = d1; cacheD1.lastFetch = now; console.log("[Twelve Data Sync] D1 Candles Cached (7 Days)"); }
   }
 
-  // H4: ດຶງ 1 ຄັ້ງຕໍ່ມື້ (24 ຊົ່ວໂມງ)
   if (!cacheH4.data.length || (now - cacheH4.lastFetch > H4_CACHE_MS)) {
     const h4 = await fetchCandles('4h', 120);
-    if (h4.length) { 
-      cacheH4.data = h4; 
-      cacheH4.lastFetch = now; 
-      console.log("[Twelve Data Sync] H4 Candles Cached (24 Hours)"); 
-    }
+    if (h4.length) { cacheH4.data = h4; cacheH4.lastFetch = now; console.log("[Twelve Data Sync] H4 Candles Cached (24 Hours)"); }
   }
 
-  // H1: ດຶງ 1 ຄັ້ງຕໍ່ມື້ (24 ຊົ່ວໂມງ)
   if (!cacheH1.data.length || (now - cacheH1.lastFetch > H1_CACHE_MS)) {
     const h1 = await fetchCandles('1h', 200);
-    if (h1.length) { 
-      cacheH1.data = h1; 
-      cacheH1.lastFetch = now; 
-      console.log("[Twelve Data Sync] H1 Candles Cached (24 Hours)"); 
-    }
+    if (h1.length) { cacheH1.data = h1; cacheH1.lastFetch = now; console.log("[Twelve Data Sync] H1 Candles Cached (24 Hours)"); }
   }
 
-  // M15: ດຶງທຸກໆ 15 ນາທີ ເພື່ອຫາຈຸດ Buy/Sell SMC
   if (!cacheM15.data.length || (now - cacheM15.lastFetch > M15_CACHE_MS)) {
     const m15 = await fetchCandles('15min', 300);
-    if (m15.length) { 
-      cacheM15.data = m15; 
-      cacheM15.lastFetch = now; 
-      console.log("[Twelve Data Sync] M15 Candles Updated (15 Mins)"); 
-    }
+    if (m15.length) { cacheM15.data = m15; cacheM15.lastFetch = now; console.log("[Twelve Data Sync] M15 Candles Updated (15 Mins)"); }
   }
 
   return { d1: cacheD1.data, h4: cacheH4.data, h1: cacheH1.data, m15: cacheM15.data };
@@ -394,7 +363,6 @@ async function processTradingLogic() {
   const { d1, h4, m15 } = await getMultiTimeframeCandles();
   const { price } = await getLivePriceFeed();
 
-  // ຄິດໄລ່ RSI & ATR ໂດຍໃຊ້ແທ່ງທຽນ M15 ຂອງ Twelve Data ໂດຍກົງ
   let rsi = 50.0;
   let atr = 14.0;
   if (m15 && m15.length > 15) {
@@ -487,7 +455,152 @@ async function getOrGenerateLiveDebate(market) {
 }
 
 // ============================================================
-// 7. API ENDPOINTS
+// 7. REAL LIVE US NEWS & TRUMP FEED (AUTO-PURGE > 7 DAYS)
+// ============================================================
+let cachedGeopolitics = null;
+let lastGeopoliticsFetch = 0;
+
+// ຟັງຊັນຊ່ວຍດຶງ ແລະ ແຍກ RSS XML ໂດຍບໍ່ຕ້ອງໃຊ້ Library ເພີ່ມ
+function parseRSSXml(xmlText) {
+  const items = [];
+  const itemMatches = xmlText.match(/<item>[\s\S]*?<\/item>/gi) || [];
+
+  for (const itemXml of itemMatches) {
+    const titleMatch = itemXml.match(/<title>([\s\S]*?)<\/title>/i);
+    const pubDateMatch = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/i);
+    const descMatch = itemXml.match(/<description>([\s\S]*?)<\/description>/i);
+
+    let title = titleMatch ? titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim() : '';
+    let pubDateStr = pubDateMatch ? pubDateMatch[1].trim() : '';
+    let desc = descMatch ? descMatch[1].replace(/<[^>]+>/g, '').replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim() : '';
+
+    const pubTime = new Date(pubDateStr).getTime();
+    if (title && !isNaN(pubTime)) {
+      items.push({ title, pubDate: pubTime, pubDateStr, desc });
+    }
+  }
+  return items;
+}
+
+async function fetchRealGeopoliticsAndTrump() {
+  const now = Date.now();
+  if (cachedGeopolitics && (now - lastGeopoliticsFetch < NEWS_CACHE_MS)) {
+    return cachedGeopolitics;
+  }
+
+  try {
+    // 1. ດຶງຂ່າວ Trump ລ່າສຸດຈາກ Google News US (Reuters, Bloomberg, CNBC, WSJ)
+    const trumpRssUrl = `https://news.google.com/rss/search?q=Trump+tariffs+OR+economy+when:7d&hl=en-US&gl=US&ceid=US:en`;
+    const macroRssUrl = `https://news.google.com/rss/search?q=Gold+price+OR+Fed+interest+rates+OR+geopolitics+war+when:7d&hl=en-US&gl=US&ceid=US:en`;
+
+    const [trumpRes, macroRes] = await Promise.all([
+      axios.get(trumpRssUrl, { timeout: 6000, headers: { 'User-Agent': 'Mozilla/5.0' } }).catch(() => ({ data: '' })),
+      axios.get(macroRssUrl, { timeout: 6000, headers: { 'User-Agent': 'Mozilla/5.0' } }).catch(() => ({ data: '' }))
+    ]);
+
+    // ກັ່ນຕອງສະເພາະຂ່າວທີ່ມີອາຍຸບໍ່ເກີນ 7 ມື້ (Auto-Purge > 7 ມື້)
+    const trumpItems = parseRSSXml(trumpRes.data).filter(item => (now - item.pubDate) <= SEVEN_DAYS_MS);
+    const macroItems = parseRSSXml(macroRes.data).filter(item => (now - item.pubDate) <= SEVEN_DAYS_MS);
+
+    // ສົ່ງຫົວຂໍ້ຂ່າວໃຫ້ AI ແປ ແລະ ວິເຄາະຜົນກະທົບຕໍ່ຄຳ
+    let trumpData = {
+      post: "Trump ສືບຕໍ່ເນັ້ນນະໂຍບາຍພາສີການຄ້າ ແລະ ເສດຖະກິດສະຫະລັດ.",
+      time: new Date().toLocaleDateString('lo-LA', { timeZone: 'Asia/Vientiane' }),
+      impactLevel: "ປານກາງ",
+      aiAnalysis: "ນະໂຍບາຍພາສີສ້າງຄວາມບໍ່ແນ່ນອນ ເຮັດໃຫ້ຄຳມີແຮງຊື້ໃນຖານະ Safe-Haven",
+      goldEffect: "Gold Bullish 🚀"
+    };
+
+    if (trumpItems.length > 0) {
+      const latestTrump = trumpItems[0];
+      const timeStr = new Date(latestTrump.pubDate).toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane' });
+      try {
+        const aiPrompt = `ແປຫົວຂໍ້ຂ່າວ Trump ນີ້ເປັນພາສາລາວສັ້ນໆ ແລະ ວິເຄາະຜົນກະທົບຕໍ່ທອງຄຳ: "${latestTrump.title}"
+ຕອບເປັນ JSON:
+{
+  "post": "ຂໍ້ຄວາມແປລາວ",
+  "impactLevel": "ສູງ ຫຼື ປານກາງ",
+  "aiAnalysis": "ວິເຄາະສັ້ນໆຕໍ່ຄຳ",
+  "goldEffect": "Gold Bullish 🚀 ຫຼື Gold Bearish 🔻"
+}`;
+        const rawAi = await executeTriBrainAI('groq', aiPrompt, "Financial news analyst.");
+        if (rawAi) {
+          const parsed = JSON.parse(rawAi.replace(/```json/g, '').replace(/```/g, '').trim());
+          trumpData = { ...parsed, time: timeStr };
+        }
+      } catch (e) {
+        trumpData.post = latestTrump.title;
+        trumpData.time = timeStr;
+      }
+    }
+
+    // ຈັດການຂ່າວດ່ວນລະດັບໂລກ (Top 4 ຂ່າວລ່າສຸດບໍ່ເກີນ 7 ມື້)
+    let processedNews = [];
+    const topMacro = macroItems.slice(0, 4);
+
+    if (topMacro.length > 0) {
+      const titles = topMacro.map((m, i) => `${i+1}. ${m.title}`).join('\n');
+      try {
+        const aiMacroPrompt = `ແປຫົວຂໍ້ຂ່າວເສດຖະກິດໂລກເຫຼົ່ານີ້ເປັນພາສາລາວ ແລະ ວິເຄາະຜົນຕໍ່ຄຳ:
+${titles}
+
+ຕອບເປັນ JSON Array:
+[
+  {
+    "category": "Fed / War / Inflation",
+    "title": "ຫົວຂໍ້ຂ່າວພາສາລາວ",
+    "summary": "ເນື້ອຫາຫຍໍ້ພາສາລາວ",
+    "aiGoldAnalysis": "ຜົນກະທົບຕໍ່ຄຳ (Bullish ຫຼື Bearish)"
+  }
+]`;
+        const rawMacro = await executeTriBrainAI('groq', aiMacroPrompt, "Financial news translator.");
+        if (rawMacro) {
+          const parsedNews = JSON.parse(rawMacro.replace(/```json/g, '').replace(/```/g, '').trim());
+          processedNews = parsedNews.map((n, i) => ({
+            ...n,
+            time: new Date(topMacro[i].pubDate).toLocaleDateString('lo-LA', { timeZone: 'Asia/Vientiane' })
+          }));
+        }
+      } catch (e) {
+        processedNews = topMacro.map(m => ({
+          category: "Macro",
+          title: m.title,
+          summary: m.desc || "ຕິດຕາມຄວາມຜັນຜວນຂອງຕະຫຼາດ",
+          aiGoldAnalysis: "ມີຜົນກະທົບຕໍ່ຄວາມຜັນຜວນຂອງຄຳ",
+          time: new Date(m.pubDate).toLocaleDateString('lo-LA', { timeZone: 'Asia/Vientiane' })
+        }));
+      }
+    }
+
+    cachedGeopolitics = {
+      success: true,
+      count: processedNews.length,
+      trump: trumpData,
+      news: processedNews
+    };
+    lastGeopoliticsFetch = now;
+    console.log(`[News Sentinel] Live News Updated (${processedNews.length} articles <= 7 days)`);
+    return cachedGeopolitics;
+
+  } catch (err) {
+    console.log("[News Sentinel] Fetch Error:", err.message);
+    return cachedGeopolitics || {
+      success: true,
+      count: 0,
+      trump: {
+        post: "Trump ຕິດຕາມມາດຕະການພາສີ ແລະ ເສດຖະກິດສະຫະລັດ.",
+        time: new Date().toLocaleDateString('lo-LA', { timeZone: 'Asia/Vientiane' }),
+        impactLevel: "ປານກາງ",
+        aiAnalysis: "ສະໜັບສະໜູນແຮງຊື້ຄຳໃນຖານະສິນຊັບປອດໄພ",
+        goldEffect: "Gold Bullish 🚀"
+      },
+      news: []
+    };
+  }
+}
+
+// ============================================================
+// 8. API ENDPOINTS
 // ============================================================
 app.get('/api/analysis', async (req, res) => {
   try {
@@ -546,19 +659,14 @@ app.get('/api/liquidity-hunt', async (req, res) => {
   }
 });
 
-app.get('/api/geopolitics', (req, res) => {
-  res.json({
-    success: true,
-    count: 1,
-    trump: {
-      post: "Trump ຢືນຢັນມາດຕະການພາສີການຄ້າ ແລະ ຕິດຕາມສະຖານະການເສດຖະກິດໂລກ.",
-      time: new Date().toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane' }),
-      impactLevel: "ປານກາງ",
-      aiAnalysis: "ສະໜັບສະໜູນແຮງຊື້ຄຳໃນຖານະສິນຊັບປອດໄພ",
-      goldEffect: "Gold Bullish 🚀"
-    },
-    news: []
-  });
+// 🌐 Endpoint ຂ່າວໂລກ & Trump ສົດໆ 100%
+app.get('/api/geopolitics', async (req, res) => {
+  try {
+    const data = await fetchRealGeopoliticsAndTrump();
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 app.get('/api/red-news', async (req, res) => {
@@ -591,8 +699,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`====================================================`);
   console.log(`[OK] Gold AI Swarm Terminal RUNNING on port ${PORT}`);
-  console.log(`[OK] Primary Engine: Twelve Data 100% Synced (XAU/USD)`);
-  console.log(`[OK] Smart Cache: Live=150s, M15=15m, H1/H4=24h, D1=7d`);
-  console.log(`[OK] Total Usage: ~674 calls/day (Safe under 800 quota)`);
+  console.log(`[OK] Spot Gold: Twelve Data (Smart Cache 150s)`);
+  console.log(`[OK] Real US News Sentinel: Active (Auto-Purge > 7 Days)`);
   console.log(`====================================================`);
 });
