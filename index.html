@@ -58,6 +58,7 @@
                 <span id="audio-name-badge" class="text-[11px] text-emerald-400 font-bold max-w-[120px] truncate">(alert.mp3)</span>
             </div>
 
+            <!-- ສຽງເຕືອນ 5 ນາທີແລ້ວດັບເອງ -->
             <div id="sound-timer-badge" class="hidden bg-red-950/80 border border-red-500/60 px-3 py-1.5 rounded-xl flex items-center gap-2">
                 <i class="fa-solid fa-volume-high text-red-400 animate-bounce"></i>
                 <span class="text-xs text-red-300 font-mono">ສຽງເຕືອນ (5 ນາທີ): <b id="sound-timer-countdown">05:00</b></span>
@@ -114,6 +115,7 @@
     <!-- ==================== VIEW 1: ໜ້າຫຼັກ ==================== -->
     <main id="view-main" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div class="lg:col-span-8 space-y-6">
+            <!-- Real-time Chart -->
             <div class="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden p-4 h-[570px] flex flex-col">
                 <div class="flex flex-wrap justify-between items-center mb-3 px-1 gap-2">
                     <span class="text-sm md:text-base font-bold text-yellow-400 flex items-center gap-2">
@@ -136,6 +138,7 @@
                 </div>
             </div>
 
+            <!-- Trend & Levels -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="bg-gray-900 border border-gray-800 p-4 md:p-5 rounded-2xl">
                     <h2 class="text-sm md:text-base font-bold text-gray-200 mb-3 flex items-center">
@@ -173,6 +176,7 @@
                 </div>
             </div>
 
+            <!-- Dynamic Signal Card -->
             <div id="signal-card" class="bg-gray-900 border-2 border-yellow-500/40 p-5 rounded-2xl glow-gold transition-all duration-300">
                 <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                     <div class="flex items-center gap-2">
@@ -201,6 +205,7 @@
             </div>
         </div>
 
+        <!-- Right Column: AI Chat Assistant -->
         <div class="lg:col-span-4">
             <div class="bg-gray-900 border-2 border-amber-500/40 p-5 rounded-2xl flex flex-col h-[570px] glow-gold">
                 <div class="flex items-center justify-between border-b border-gray-800 pb-3 mb-3">
@@ -384,4 +389,437 @@
                     <p class="text-xs md:text-sm text-gray-300">AI ສະແກນຂ່າວສະຫະລັດ, Trump, Fed, War ມາສະຫຼຸບຜົນກະທົບຕໍ່ທອງຄຳ</p>
                 </div>
             </div>
-            <button onclick="fetchGeopolitics()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs md:text-sm transition flex items-center gap-1.5 shadow
+            <button onclick="fetchGeopolitics()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs md:text-sm transition flex items-center gap-1.5 shadow-md">
+                <i class="fa-solid fa-arrows-rotate"></i> ອັບເດດຂ່າວໃໝ່
+            </button>
+        </div>
+
+        <div class="bg-gradient-to-r from-gray-900 via-gray-900 to-amber-950/40 border-2 border-amber-500/70 p-5 rounded-2xl glow-gold space-y-3">
+            <div class="flex flex-wrap justify-between items-center border-b border-gray-800 pb-2.5">
+                <div class="flex items-center gap-2">
+                    <i class="fa-brands fa-x-twitter text-amber-400 text-xl"></i>
+                    <span class="font-bold text-amber-400 text-sm md:text-base">ໂພສ/ຂ່າວ Trump ລ່າສຸດ & ນະໂຍບາຍການຄ້າ</span>
+                    <span class="bg-red-500/20 text-red-400 border border-red-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono uppercase">PINNED TRUMP FEED</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs font-mono">
+                    <span id="trump-time" class="text-gray-400">...</span>
+                    <span id="trump-impact" class="bg-red-500/20 text-red-400 font-bold px-2.5 py-0.5 rounded">ຮ້າຍແຮງ</span>
+                </div>
+            </div>
+            <p id="trump-post" class="text-white text-sm md:text-base font-semibold leading-relaxed italic">
+                ກຳລັງດຶງໂພສ Trump ລ່າສຸດ...
+            </p>
+            <div class="bg-gray-800/80 p-3 rounded-xl border border-gray-700/80 flex flex-wrap justify-between items-center text-xs">
+                <span id="trump-analysis" class="text-amber-200/90 leading-relaxed max-w-3xl">...</span>
+                <span id="trump-gold-effect" class="font-bold font-mono text-emerald-400 mt-2 sm:mt-0">Gold Bullish 🚀</span>
+            </div>
+        </div>
+
+        <div>
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-sm font-bold text-gray-300 flex items-center gap-2">
+                    <i class="fa-solid fa-newspaper text-yellow-400"></i>
+                    ຂ່າວດ່ວນລະດັບໂລກ (<span id="macro-news-count">0</span> ຂ່າວ - ອາຍຸບໍ່ເກີນ 7 ມື້)
+                </h3>
+            </div>
+            <div id="macro-news-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </div>
+    </section>
+
+    <!-- ==================== JAVASCRIPT ==================== -->
+    <script>
+        const API_BASE = "/api";
+        let activeTab = 'main';
+
+        let customAudioUrl = "/alert.mp3";
+        let isSoundPlaying = false;
+        let soundTimerInterval = null;
+        let soundTimeRemaining = 300;
+        let lastPlayedSignalId = null;
+
+        function unlockAudioOnce() {
+            const player = document.getElementById('audio-alert-player');
+            if (player && player.paused && !isSoundPlaying) {
+                player.play().then(() => { player.pause(); player.currentTime = 0; }).catch(() => {});
+            }
+        }
+
+        function loadCustomAudio(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (customAudioUrl && customAudioUrl !== "/alert.mp3") URL.revokeObjectURL(customAudioUrl);
+                customAudioUrl = URL.createObjectURL(file);
+                const player = document.getElementById('audio-alert-player');
+                player.src = customAudioUrl;
+                document.getElementById('audio-name-badge').innerText = `(${file.name.substring(0, 10)}...)`;
+                alert(`ປ່ຽນເພງແຈ້ງເຕືອນສຳເລັດ: ${file.name}`);
+            }
+        }
+
+        function start5MinuteAlertSound(sigId) {
+            if (!sigId || lastPlayedSignalId === sigId) return;
+            lastPlayedSignalId = sigId;
+
+            if (isSoundPlaying) stopSoundAlertManually();
+            isSoundPlaying = true;
+            soundTimeRemaining = 300;
+
+            const badge = document.getElementById('sound-timer-badge');
+            const countdownEl = document.getElementById('sound-timer-countdown');
+            badge.classList.remove('hidden');
+
+            const player = document.getElementById('audio-alert-player');
+            player.currentTime = 0;
+            player.play().catch(() => {});
+
+            clearInterval(soundTimerInterval);
+            soundTimerInterval = setInterval(() => {
+                soundTimeRemaining--;
+                const m = Math.floor(soundTimeRemaining / 60).toString().padStart(2, '0');
+                const s = (soundTimeRemaining % 60).toString().padStart(2, '0');
+                countdownEl.innerText = `${m}:${s}`;
+
+                if (soundTimeRemaining <= 0) {
+                    stopSoundAlertManually();
+                }
+            }, 1000);
+        }
+
+        function stopSoundAlertManually() {
+            isSoundPlaying = false;
+            clearInterval(soundTimerInterval);
+            const player = document.getElementById('audio-alert-player');
+            player.pause();
+            player.currentTime = 0;
+            document.getElementById('sound-timer-badge').classList.add('hidden');
+        }
+
+        function switchTab(tab) {
+            activeTab = tab;
+            const btnMain = document.getElementById('tab-btn-main');
+            const btnNews = document.getElementById('tab-btn-news');
+            const btnLiq = document.getElementById('tab-btn-liq');
+            const btnDebate = document.getElementById('tab-btn-debate');
+            const btnGeo = document.getElementById('tab-btn-geo');
+
+            const viewMain = document.getElementById('view-main');
+            const viewNews = document.getElementById('view-news');
+            const viewLiq = document.getElementById('view-liq');
+            const viewDebate = document.getElementById('view-debate');
+            const viewGeo = document.getElementById('view-geo');
+
+            [btnMain, btnNews, btnLiq, btnDebate, btnGeo].forEach(b => {
+                b.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-gray-800/80 text-gray-300 hover:text-white hover:bg-gray-800 border border-transparent";
+            });
+            viewMain.classList.add('hidden');
+            viewNews.classList.add('hidden');
+            viewLiq.classList.add('hidden');
+            viewDebate.classList.add('hidden');
+            viewGeo.classList.add('hidden');
+
+            if (tab === 'main') {
+                btnMain.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-amber-500 text-slate-950 shadow-md";
+                viewMain.classList.remove('hidden');
+            } else if (tab === 'news') {
+                btnNews.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-red-600 text-white shadow-md glow-red";
+                viewNews.classList.remove('hidden');
+                fetchRedNews();
+            } else if (tab === 'liq') {
+                btnLiq.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-purple-600 text-white shadow-md glow-purple";
+                viewLiq.classList.remove('hidden');
+                fetchLiquidityAnalysis();
+            } else if (tab === 'debate') {
+                btnDebate.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-cyan-600 text-white shadow-md glow-blue";
+                viewDebate.classList.remove('hidden');
+            } else if (tab === 'geo') {
+                btnGeo.className = "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all duration-200 bg-amber-600 text-white shadow-md glow-amber";
+                viewGeo.classList.remove('hidden');
+                fetchGeopolitics();
+            }
+        }
+
+        function updateAsiaClock() {
+            document.getElementById('asia-clock').innerText = "Vientiane: " + new Date().toLocaleString('lo-LA', { 
+                timeZone: 'Asia/Vientiane', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' 
+            });
+        }
+        setInterval(updateAsiaClock, 1000);
+        updateAsiaClock();
+
+        async function fetchAnalysis() {
+            try {
+                const res = await fetch(`${API_BASE}/analysis`);
+                const data = await res.json();
+                if (!data.success) return;
+
+                const debateStatusEl = document.getElementById('debate-chart-status');
+                if (debateStatusEl) {
+                    debateStatusEl.innerText = `XAU: $${data.currentPrice} | RSI: ${data.rsi} | ${data.htfTrend}`;
+                }
+
+                document.getElementById('trend-direction').innerText = data.htfTrend;
+                document.getElementById('rsi-badge').innerText = `RSI: ${data.rsi}`;
+                document.getElementById('trend-desc').innerText = `* Setup SMC: ${data.signal.setupRule}`;
+
+                document.getElementById('lvl-r2').innerText = `$${data.levels.r2}`;
+                document.getElementById('lvl-r1').innerText = `$${data.levels.r1}`;
+                document.getElementById('lvl-s1').innerText = `$${data.levels.s1}`;
+                document.getElementById('lvl-s2').innerText = `$${data.levels.s2}`;
+
+                const sigCard = document.getElementById('signal-card');
+                const sigBadge = document.getElementById('signal-type');
+
+                if (data.signal.type === 'BUY') {
+                    sigCard.className = "bg-gray-900 border-2 border-emerald-500 p-5 rounded-2xl shadow-lg shadow-emerald-950/50";
+                    sigBadge.className = "bg-emerald-500 text-black text-xs md:text-sm font-bold px-4 py-1.5 rounded-full animate-bounce";
+                    sigBadge.innerHTML = `<i class="fa-solid fa-arrow-trend-up mr-1"></i> AUTO SIGNAL: BUY (2h)`;
+                    start5MinuteAlertSound(data.signal.signalId);
+                } else if (data.signal.type === 'SELL') {
+                    sigCard.className = "bg-gray-900 border-2 border-red-500 p-5 rounded-2xl shadow-lg shadow-red-950/50";
+                    sigBadge.className = "bg-red-500 text-white text-xs md:text-sm font-bold px-4 py-1.5 rounded-full animate-bounce";
+                    sigBadge.innerHTML = `<i class="fa-solid fa-arrow-trend-down mr-1"></i> AUTO SIGNAL: SELL (2h)`;
+                    start5MinuteAlertSound(data.signal.signalId);
+                } else {
+                    sigCard.className = "bg-gray-900 border-2 border-yellow-500/40 p-5 rounded-2xl glow-gold";
+                    sigBadge.className = "bg-yellow-500 text-slate-950 text-xs md:text-sm font-bold px-4 py-1.5 rounded-full";
+                    sigBadge.innerHTML = `<i class="fa-solid fa-hourglass-half mr-1"></i> ກຳລັງຊອກຫາຈຸດ Buy-Sell ໃໝ່...`;
+                }
+
+                document.getElementById('sig-rr').innerText = `R:R = ${data.signal.rrRatio}`;
+                document.getElementById('sig-entry').innerText = data.signal.entry;
+                document.getElementById('sig-tp1').innerText = data.signal.tp1;
+                document.getElementById('sig-tp2').innerText = data.signal.tp2;
+                document.getElementById('sig-tp3').innerText = data.signal.tp3;
+                document.getElementById('sig-tp4').innerText = data.signal.tp4;
+                document.getElementById('sig-tp5').innerText = data.signal.tp5;
+                document.getElementById('sig-sl').innerText = data.signal.sl;
+            } catch (err) {}
+        }
+
+        async function fetchLiquidityAnalysis() {
+            try {
+                const res = await fetch(`${API_BASE}/liquidity-hunt`);
+                const data = await res.json();
+                if (!data.success) return;
+
+                const banner = document.getElementById('liq-alert-banner');
+                const actionBox = document.getElementById('liq-action-box');
+                const recAction = document.getElementById('liq-recommended-action');
+                const actDetails = document.getElementById('liq-action-details');
+
+                document.getElementById('liq-cleared-price').innerText = `$${data.clearedPrice}`;
+                document.getElementById('liq-type-text').innerText = data.liquidityType;
+                document.getElementById('liq-tp5-target').innerText = data.tp5;
+                document.getElementById('liq-mm-status').innerText = data.marketMakerStatus;
+
+                if (data.isCleared) {
+                    if (data.signalAction === 'BUY') {
+                        banner.className = "p-5 rounded-2xl border-2 border-emerald-500 bg-emerald-950/40 text-emerald-200 flex flex-wrap justify-between items-center pulse-alert shadow-lg";
+                        banner.innerHTML = `<div class="flex items-center gap-3"><i class="fa-solid fa-triangle-exclamation text-emerald-400 text-3xl"></i><div><h2 class="text-base md:text-lg font-bold text-white">🚨 ແຈ້ງເຕືອນ: SMC BUY TRIGGERED!</h2><p class="text-xs text-emerald-300">${data.liquidityType} ທີ່ $${data.suggestedEntry}</p></div></div>`;
+                        actionBox.className = "bg-gray-900 border-2 border-emerald-500/70 p-5 rounded-2xl text-center space-y-2 glow-gold";
+                        recAction.className = "text-xl font-bold font-mono text-emerald-400";
+                        recAction.innerText = "ACTION: AUTO BUY";
+                    } else {
+                        banner.className = "p-5 rounded-2xl border-2 border-red-500 bg-red-950/40 text-red-200 flex flex-wrap justify-between items-center pulse-alert shadow-lg";
+                        banner.innerHTML = `<div class="flex items-center gap-3"><i class="fa-solid fa-triangle-exclamation text-red-400 text-3xl"></i><div><h2 class="text-base md:text-lg font-bold text-white">🚨 ແຈ້ງເຕືອນ: SMC SELL TRIGGERED!</h2><p class="text-xs text-red-300">${data.liquidityType} ທີ່ $${data.suggestedEntry}</p></div></div>`;
+                        actionBox.className = "bg-gray-900 border-2 border-red-500/70 p-5 rounded-2xl text-center space-y-2 glow-red";
+                        recAction.className = "text-xl font-bold font-mono text-red-400";
+                        recAction.innerText = "ACTION: AUTO SELL";
+                    }
+                    actDetails.innerText = `ຈຸດເຂົ້າ: $${data.suggestedEntry} | SL: $${data.suggestedSL} | TP1: $${data.tp1} | TP5: $${data.tp5}`;
+                } else {
+                    banner.className = "p-4 rounded-2xl border border-gray-700 bg-gray-800/60 text-gray-300 flex flex-wrap justify-between items-center";
+                    banner.innerHTML = `<div class="flex items-center gap-3"><i class="fa-solid fa-spinner fa-spin text-purple-400 text-2xl"></i><div><h2 class="text-sm md:text-base font-bold text-gray-200">ກຳລັງສະແກນຫາ 4 Setups (Non-Inducement Verified)</h2></div></div>`;
+                    actionBox.className = "bg-gray-900 border border-gray-700 p-5 rounded-2xl text-center space-y-2";
+                    recAction.className = "text-lg font-bold font-mono text-yellow-400";
+                    recAction.innerText = "WAITING: ລໍຖ້າກາຟຄົບເງື່ອນໄຂ 4 SMC Setups";
+                    actDetails.innerText = "ກຳລັງສະແກນ Multi-Timeframe...";
+                }
+
+                drawLiquidityVisual(data);
+            } catch (err) {}
+        }
+
+        function drawLiquidityVisual(data) {
+            const canvas = document.getElementById('liquidityCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = "#090d16";
+            ctx.fillRect(0, 0, w, h);
+
+            ctx.strokeStyle = "#1e293b";
+            ctx.lineWidth = 1;
+            for (let y = 30; y < h; y += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+            }
+
+            const isSweepHigh = data.signalAction === 'SELL';
+            const levelY = isSweepHigh ? 90 : 250;
+            const levelColor = isSweepHigh ? "#ef4444" : "#10b981";
+
+            ctx.strokeStyle = levelColor;
+            ctx.setLineDash([6, 4]);
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(30, levelY);
+            ctx.lineTo(w - 30, levelY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.font = "bold 11px JetBrains Mono";
+            ctx.fillStyle = levelColor;
+            ctx.fillText(isSweepHigh ? `Major Key Level BSL $${data.clearedPrice}` : `Major Key Level SSL $${data.clearedPrice}`, 40, isSweepHigh ? levelY - 10 : levelY + 20);
+
+            const candles = [
+                { x: 80, o: 150, c: isSweepHigh ? 210 : 90, h: isSweepHigh ? 220 : 80, l: isSweepHigh ? 140 : 220, bull: !isSweepHigh },
+                { x: 160, o: isSweepHigh ? 210 : 90, c: isSweepHigh ? 160 : 140, h: isSweepHigh ? 215 : 150, l: isSweepHigh ? 150 : 90, bull: isSweepHigh },
+                { x: 260, o: isSweepHigh ? 160 : 140, c: isSweepHigh ? 120 : 180, h: isSweepHigh ? 165 : 190, l: isSweepHigh ? 110 : 130, bull: isSweepHigh },
+                { x: 360, o: isSweepHigh ? 115 : 195, c: isSweepHigh ? 135 : 175, h: isSweepHigh ? 65 : 210, l: isSweepHigh ? 145 : 280, bull: !isSweepHigh, isSweep: true },
+                { x: 460, o: isSweepHigh ? 135 : 175, c: isSweepHigh ? 210 : 100, h: isSweepHigh ? 140 : 180, l: isSweepHigh ? 220 : 90, bull: !isSweepHigh },
+                { x: 540, o: isSweepHigh ? 210 : 100, c: isSweepHigh ? 260 : 60, h: isSweepHigh ? 215 : 110, l: isSweepHigh ? 270 : 50, bull: !isSweepHigh }
+            ];
+
+            candles.forEach(c => {
+                ctx.strokeStyle = c.bull ? "#10b981" : "#ef4444";
+                ctx.fillStyle = c.bull ? "#10b981" : "#ef4444";
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(c.x, c.h);
+                ctx.lineTo(c.x, c.l);
+                ctx.stroke();
+
+                const top = Math.min(c.o, c.c);
+                const height = Math.abs(c.o - c.c) || 4;
+                ctx.fillRect(c.x - 10, top, 20, height);
+
+                if (c.isSweep) {
+                    ctx.fillStyle = "#eab308";
+                    ctx.font = "bold 13px 'Phetsarath'";
+                    ctx.fillText("🔥 ຈຸດ Clear Liquidity ແທ້", c.x - 70, isSweepHigh ? 50 : 300);
+                    ctx.strokeStyle = "#eab308";
+                    ctx.beginPath();
+                    ctx.arc(c.x, isSweepHigh ? c.h : c.l, 10, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            });
+        }
+
+        async function fetchAutoBotDebate() {
+            try {
+                const res = await fetch(`${API_BASE}/swarm-live-debate`);
+                const data = await res.json();
+                if (!data.success || !data.messages) return;
+
+                if (data.marketSnapshot) {
+                    document.getElementById('debate-chart-status').innerText = `XAU: $${data.marketSnapshot.price} | RSI: ${data.marketSnapshot.rsi} | ${data.marketSnapshot.status}`;
+                }
+
+                const chatStream = document.getElementById('twitch-chat-stream');
+                data.messages.forEach((m, idx) => {
+                    setTimeout(() => {
+                        let badgeHtml = m.badge === 'mod' ? `<span class="bg-purple-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold mr-1">MOD</span>` : (m.badge === 'vip' ? `<span class="bg-cyan-600 text-slate-950 text-[9px] px-1.5 py-0.5 rounded font-bold mr-1">VIP</span>` : `<span class="bg-amber-500 text-slate-950 text-[9px] px-1.5 py-0.5 rounded font-bold mr-1">BOT</span>`);
+                        const line = document.createElement('div');
+                        line.className = "py-1 px-1.5 rounded hover:bg-gray-800/40 transition flex items-start gap-1.5";
+                        line.innerHTML = `<span class="text-gray-500 text-[11px]">[${m.time}]</span><div>${badgeHtml}<span class="font-bold ${m.color}">${m.agent}</span>: <span class="text-gray-200">${m.message}</span></div>`;
+                        chatStream.appendChild(line);
+                        chatStream.scrollTop = chatStream.scrollHeight;
+                    }, idx * 1200);
+                });
+            } catch (e) {}
+        }
+
+        function clearChatStream() {
+            document.getElementById('twitch-chat-stream').innerHTML = `<div class="text-gray-500 text-[11px] py-1">[System]: ລຶບປະຫວັດແຊັດແລ້ວ.</div>`;
+        }
+
+        async function fetchGeopolitics() {
+            try {
+                const res = await fetch(`${API_BASE}/geopolitics`);
+                const data = await res.json();
+                if (!data.success) return;
+
+                if (data.trump) {
+                    document.getElementById('trump-post').innerText = `"${data.trump.post}"`;
+                    document.getElementById('trump-time').innerText = data.trump.time;
+                    document.getElementById('trump-impact').innerText = data.trump.impactLevel;
+                    document.getElementById('trump-analysis').innerText = `→ AI ວິເຄາະ: ${data.trump.aiAnalysis}`;
+                    document.getElementById('trump-gold-effect').innerText = data.trump.goldEffect;
+                }
+
+                document.getElementById('macro-news-count').innerText = data.count;
+                const container = document.getElementById('macro-news-grid');
+                container.innerHTML = data.news.map(item => `
+                    <div class="bg-gray-900 border border-gray-800 p-4 rounded-2xl space-y-3">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded">${item.category}</span>
+                            <span class="text-gray-400 font-mono">${item.time}</span>
+                        </div>
+                        <h4 class="font-bold text-white text-sm">${item.title}</h4>
+                        <p class="text-xs text-gray-300 bg-gray-800/60 p-2.5 rounded-xl">${item.summary}</p>
+                        <div class="text-xs text-amber-300 bg-gray-800/90 p-2 rounded-xl"><b>AI:</b> ${item.aiGoldAnalysis}</div>
+                    </div>
+                `).join('');
+            } catch (err) {}
+        }
+
+        async function fetchRedNews() {
+            try {
+                const res = await fetch(`${API_BASE}/red-news`);
+                const result = await res.json();
+                if (result.success) {
+                    document.getElementById('red-news-badge').innerText = result.count;
+                    document.getElementById('red-news-grid').innerHTML = result.data.map(item => `
+                        <div class="bg-gray-900 border border-gray-800 p-4 rounded-2xl space-y-2">
+                            <div class="flex justify-between text-xs">
+                                <span class="bg-blue-600/20 text-blue-400 px-2 py-0.5 rounded">USD</span>
+                                <span class="text-amber-400 font-mono">${item.date} | ${item.time}</span>
+                            </div>
+                            <h3 class="text-sm font-bold text-gray-100">${item.title}</h3>
+                            <div>${item.analysis}</div>
+                        </div>
+                    `).join('');
+                }
+            } catch (err) {}
+        }
+
+        async function handleUserChatSubmit(e) {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const q = input.value.trim();
+            if (!q) return;
+
+            const qaBox = document.getElementById('user-qa-box');
+            qaBox.innerHTML += `<div class="bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl text-right text-amber-300"><b class="text-[11px] block">ທ່ານ:</b><span>${q}</span></div>`;
+            input.value = "";
+            qaBox.scrollTop = qaBox.scrollHeight;
+
+            const res = await fetch(`${API_BASE}/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question: q })
+            });
+            const data = await res.json();
+            qaBox.innerHTML += `<div class="bg-gray-800/90 p-3 rounded-xl border border-gray-700 text-gray-200"><b class="text-amber-400 block mb-1">AI Assistant:</b><p>${data.answer}</p></div>`;
+            qaBox.scrollTop = qaBox.scrollHeight;
+        }
+
+        fetchAnalysis();
+        fetchGeopolitics();
+        fetchRedNews();
+        fetchLiquidityAnalysis();
+        fetchAutoBotDebate();
+
+        setInterval(fetchAnalysis, 4000);
+        setInterval(fetchLiquidityAnalysis, 6000);
+        setInterval(fetchAutoBotDebate, 60000);
+        setInterval(fetchGeopolitics, 60000);
+    </script>
+</body>
+</html>
