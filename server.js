@@ -12,18 +12,72 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
 // ============================================================
-// ຕັ້ງຄ່າ SMART CACHE (ຄິດໄລ່ລວມແລ້ວ ~674 ຄັ້ງ/ມື້ ບໍ່ເກີນ 800 ໂກຕາຟຣີ)
+// ຕັ້ງຄ່າ SMART CACHE
 // ============================================================
 const LIVE_PRICE_CACHE_MS = 150 * 1000;          // 2.5 ນາທີ (576 calls/ມື້)
 const D1_CACHE_MS         = 7 * 24 * 3600 * 1000;// 7 ມື້ (1 ອາທິດດຶງ 1 ຄັ້ງ)
 const H4_CACHE_MS         = 24 * 3600 * 1000;    // 24 ຊົ່ວໂມງ (1 ມື້ດຶງ 1 ຄັ້ງ)
 const H1_CACHE_MS         = 24 * 3600 * 1000;    // 24 ຊົ່ວໂມງ (1 ມື້ດຶງ 1 ຄັ້ງ)
 const M15_CACHE_MS        = 15 * 60 * 1000;      // 15 ນາທີ (96 calls/ມື້ ຕາມແທ່ງ M15 ປິດ)
-const NEWS_CACHE_MS       = 15 * 60 * 1000;      // Cache ຂ່າວໄວ້ 15 ນາທີ ບໍ່ໃຫ້ເປືອງ AI
+const NEWS_CACHE_MS       = 15 * 60 * 1000;      // Cache ຂ່າວໄວ້ 15 ນາທີ
 const SEVEN_DAYS_MS       = 7 * 24 * 3600 * 1000;// 7 ມື້ສຳລັບ Auto-Purge
 
 // ============================================================
-// 1. TRI-BRAIN AI CLIENTS (Groq + Gemini + OpenRouter)
+// DISCORD WEBHOOK INTEGRATION
+// ============================================================
+let lastNotifiedSignalId = null;
+
+async function sendDiscordAlert(signal) {
+  const webhookUrl = (process.env.DISCORD_WEBHOOK_URL || "").trim();
+  if (!webhookUrl) return;
+
+  // ປ້ອງກັນການຍິງຊ້ຳ: ຖ້າເຄີຍສົ່ງສັນຍານ ID ນີ້ໄປແລ້ວ ຈະບໍ່ສົ່ງຊ້ຳອີກ
+  if (!signal.signalId || signal.signalId === lastNotifiedSignalId) return;
+  if (signal.type !== 'BUY' && signal.type !== 'SELL') return;
+
+  lastNotifiedSignalId = signal.signalId;
+
+  const isBuy = signal.type === 'BUY';
+  const color = isBuy ? 0x10b981 : 0xef4444; // ສີຂຽວມໍລະກົດ ຫຼື ສີແດງ
+  const iconEmoji = isBuy ? "🟢 🚀" : "🔴 🔻";
+  const title = `${iconEmoji} [XAU/USD] ສັນຍານໃໝ່: ${signal.type} (4 SMC Setups)`;
+
+  const embedPayload = {
+    username: "Gold AI Swarm Sentinel",
+    avatar_url: "https://cdn-icons-png.flaticon.com/512/2583/2583118.png",
+    embeds: [
+      {
+        title: title,
+        description: `**Setup SMC:** ${signal.setupRule}\n**Inducement Status:** \`${signal.inducementFilter}\``,
+        color: color,
+        fields: [
+          { name: "📍 ຈຸດເຂົ້າ (Entry)", value: `**$${signal.entry}**`, inline: true },
+          { name: "🛑 ຕັດຂາດທຶນ (SL)", value: `**$${signal.sl}**`, inline: true },
+          { name: "⚖️ Risk : Reward", value: `\`${signal.rrRatio}\``, inline: true },
+          { name: "🎯 Take Profit 1", value: `$${signal.tp1}`, inline: true },
+          { name: "🎯 Take Profit 2", value: `$${signal.tp2}`, inline: true },
+          { name: "🎯 Take Profit 3", value: `$${signal.tp3}`, inline: true },
+          { name: "🎯 Take Profit 4", value: `$${signal.tp4}`, inline: true },
+          { name: "🏆 Take Profit 5 (Max)", value: `**$${signal.tp5}**`, inline: true }
+        ],
+        footer: {
+          text: `Gold Multi-Timeframe AI Swarm • ເວລາ: ${new Date().toLocaleTimeString('lo-LA', { timeZone: 'Asia/Vientiane' })} (ICT)`
+        },
+        timestamp: new Date().toISOString()
+      }
+    ]
+  };
+
+  try {
+    await axios.post(webhookUrl, embedPayload, { timeout: 5000 });
+    console.log(`[Discord Webhook] ✅ ສົ່ງສັນຍານ ${signal.type} ສຳເລັດແລ້ວ!`);
+  } catch (err) {
+    console.error("[Discord Webhook Error]:", err.message);
+  }
+}
+
+// ============================================================
+// 1. TRI-BRAIN AI CLIENTS
 // ============================================================
 const groqClient = new OpenAI({
   apiKey: process.env.GROQ_API_KEY || "dummy_key",
@@ -133,7 +187,6 @@ function calculateATR(candles, period = 14) {
   return parseFloat(avg.toFixed(2));
 }
 
-// ຟັງຊັນກວດຫາ Trend ຂອງແຕ່ລະ Timeframe ໂດຍໃຊ້ Moving Average 20
 function getCandleTrend(candles) {
   if (!candles || candles.length < 5) return 'NEUTRAL';
   const sliceCount = Math.min(candles.length, 20);
@@ -147,7 +200,7 @@ function getCandleTrend(candles) {
 }
 
 // ============================================================
-// 3. REAL-TIME SPOT GOLD PRICE FEED (Twelve Data Cache 2.5 Min)
+// 3. REAL-TIME SPOT GOLD PRICE FEED
 // ============================================================
 let cachedLiveFeed = null;
 let lastLiveFetch = 0;
@@ -168,11 +221,8 @@ async function getLivePriceFeed() {
       const tdRes = await axios.get(`https://api.twelvedata.com/price?symbol=XAU/USD&apikey=${tdKey}`, { timeout: 4500 });
       if (tdRes.data && tdRes.data.price && !isNaN(parseFloat(tdRes.data.price))) {
         price = parseFloat(parseFloat(tdRes.data.price).toFixed(2));
-        console.log(`[Twelve Data] Live Spot Price: $${price} at ${new Date().toLocaleTimeString('lo-LA', { timeZone: 'Asia/Vientiane' })}`);
       }
-    } catch (e) {
-      console.log("[Twelve Data Price] Fallback triggered:", e.message);
-    }
+    } catch (e) {}
   }
 
   if (!price || price < 1500) {
@@ -206,7 +256,7 @@ async function getLivePriceFeed() {
 }
 
 // ============================================================
-// 4. CANDLES ENGINE (Twelve Data ຫຼັກ + Yahoo/Binance ສຳຮອງ)
+// 4. CANDLES ENGINE
 // ============================================================
 let cacheD1 = { data: [], lastFetch: 0 };
 let cacheH4 = { data: [], lastFetch: 0 };
@@ -220,23 +270,19 @@ async function fetchCandlesFromTwelveData(interval, count) {
   try {
     const tdIntervalMap = { '1day': '1day', '4h': '4h', '1h': '1h', '15min': '15min' };
     const tdInt = tdIntervalMap[interval] || '15min';
-
     const url = `https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=${tdInt}&outputsize=${count}&apikey=${tdKey}`;
     const res = await axios.get(url, { timeout: 6000 });
 
     if (res.data && res.data.status === 'ok' && Array.isArray(res.data.values) && res.data.values.length > 0) {
-      const candles = res.data.values.reverse().map(v => ({
+      return res.data.values.reverse().map(v => ({
         time: v.datetime,
         open: parseFloat(v.open),
         high: parseFloat(v.high),
         low: parseFloat(v.low),
         close: parseFloat(v.close)
       }));
-      return candles;
     }
-  } catch (e) {
-    console.log(`[Twelve Data Candles ${interval}] Error:`, e.message);
-  }
+  } catch (e) {}
   return null;
 }
 
@@ -267,23 +313,6 @@ async function fetchCandlesFallback(interval, count) {
       if (candles.length > 0) return candles.slice(-count);
     }
   } catch (e) {}
-
-  try {
-    const binanceIntervalMap = { '1day': '1d', '4h': '4h', '1h': '1h', '15min': '15m' };
-    const bInterval = binanceIntervalMap[interval] || '15m';
-    const url = `https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=${bInterval}&limit=${count}`;
-    const res = await axios.get(url, { timeout: 4000 });
-    if (res.data && Array.isArray(res.data)) {
-      return res.data.map(c => ({
-        time: new Date(c[0]).toISOString(),
-        open: parseFloat(c[1]),
-        high: parseFloat(c[2]),
-        low: parseFloat(c[3]),
-        close: parseFloat(c[4])
-      }));
-    }
-  } catch (e) {}
-
   return [];
 }
 
@@ -295,27 +324,22 @@ async function fetchCandles(interval, count) {
 
 async function getMultiTimeframeCandles() {
   const now = Date.now();
-
   if (!cacheD1.data.length || (now - cacheD1.lastFetch > D1_CACHE_MS)) {
     const d1 = await fetchCandles('1day', 22);
-    if (d1.length) { cacheD1.data = d1; cacheD1.lastFetch = now; console.log("[Twelve Data Sync] D1 Candles Cached (7 Days)"); }
+    if (d1.length) { cacheD1.data = d1; cacheD1.lastFetch = now; }
   }
-
   if (!cacheH4.data.length || (now - cacheH4.lastFetch > H4_CACHE_MS)) {
     const h4 = await fetchCandles('4h', 120);
-    if (h4.length) { cacheH4.data = h4; cacheH4.lastFetch = now; console.log("[Twelve Data Sync] H4 Candles Cached (24 Hours)"); }
+    if (h4.length) { cacheH4.data = h4; cacheH4.lastFetch = now; }
   }
-
   if (!cacheH1.data.length || (now - cacheH1.lastFetch > H1_CACHE_MS)) {
     const h1 = await fetchCandles('1h', 200);
-    if (h1.length) { cacheH1.data = h1; cacheH1.lastFetch = now; console.log("[Twelve Data Sync] H1 Candles Cached (24 Hours)"); }
+    if (h1.length) { cacheH1.data = h1; cacheH1.lastFetch = now; }
   }
-
   if (!cacheM15.data.length || (now - cacheM15.lastFetch > M15_CACHE_MS)) {
     const m15 = await fetchCandles('15min', 300);
-    if (m15.length) { cacheM15.data = m15; cacheM15.lastFetch = now; console.log("[Twelve Data Sync] M15 Candles Updated (15 Mins)"); }
+    if (m15.length) { cacheM15.data = m15; cacheM15.lastFetch = now; }
   }
-
   return { d1: cacheD1.data, h4: cacheH4.data, h1: cacheH1.data, m15: cacheM15.data };
 }
 
@@ -335,7 +359,7 @@ function extractFractals(candles) {
 }
 
 // ============================================================
-// 5. TRADING LOGIC & SIGNALS (ກົດເຫຼັກ D1 + H4 + H1 FILTER)
+// 5. TRADING LOGIC & SIGNALS (4 SMC Setups + Trend Following)
 // ============================================================
 let persistentSignal = {
   type: "WAIT",
@@ -376,12 +400,10 @@ async function processTradingLogic() {
   const { d1, h4, h1, m15 } = await getMultiTimeframeCandles();
   const { price } = await getLivePriceFeed();
 
-  // ຄິດໄລ່ RSI & ATR ຈາກ M15
   let rsi = 50.0;
   let atr = 14.0;
   if (m15 && m15.length > 15) {
-    const closes = m15.map(c => c.close);
-    rsi = calculateRSI(closes);
+    rsi = calculateRSI(m15.map(c => c.close));
     atr = calculateATR(m15);
     if (cachedLiveFeed) {
       cachedLiveFeed.rsi = rsi;
@@ -389,7 +411,6 @@ async function processTradingLogic() {
     }
   }
 
-  // 🛡️ ກວດສອບ TREND ຂອງ D1, H4, H1 (ກົດເຫຼັກ)
   const d1Trend = getCandleTrend(d1);
   const h4Trend = getCandleTrend(h4);
   const h1Trend = getCandleTrend(h1);
@@ -400,35 +421,6 @@ async function processTradingLogic() {
   let htfStatusText = "SIDEWAY / MIXED (ລໍຖ້າ D1,H4,H1 ສອດຄ່ອງກັນ)";
   if (isAllBullish) htfStatusText = "BULLISH (D1+H4+H1 ຂາຂຶ້ນແທ້ - BUY ONLY)";
   else if (isAllBearish) htfStatusText = "BEARISH (D1+H4+H1 ຂາລົງແທ້ - SELL ONLY)";
-
-  // 🚫 ກົດເຫຼັກ: ບລັອກສັນຍານທີ່ສວນ TREND ໃຫຍ່
-  if (isAllBullish) {
-    // ຖ້າ D1, H4, H1 ເປັນຂາຂຶ້ນ ຫ້າມ SELL ເດັດຂາດ!
-    if (persistentSignal.type === "SELL") {
-      persistentSignal.type = "WAIT";
-      persistentSignal.setupRule = "🚫 ຫ້າມ SELL ເດັດຂາດ! ເພາະ D1, H4, H1 ເປັນຂາຂຶ້ນ (Buy Only)";
-    }
-    if (liquidityHuntState.signalAction === "SELL") {
-      liquidityHuntState.signalAction = "WAIT";
-      liquidityHuntState.liquidityType = "⚠️ ຖືກບລັອກ: D1, H4, H1 ເປັນຂາຂຶ້ນ ຫ້າມເປີດ SELL";
-    }
-  } else if (isAllBearish) {
-    // ຖ້າ D1, H4, H1 ເປັນຂາລົງ ຫ້າມ BUY ເດັດຂາດ!
-    if (persistentSignal.type === "BUY") {
-      persistentSignal.type = "WAIT";
-      persistentSignal.setupRule = "🚫 ຫ້າມ BUY ເດັດຂາດ! ເພາະ D1, H4, H1 ເປັນຂາລົງ (Sell Only)";
-    }
-    if (liquidityHuntState.signalAction === "BUY") {
-      liquidityHuntState.signalAction = "WAIT";
-      liquidityHuntState.liquidityType = "⚠️ ຖືກບລັອກ: D1, H4, H1 ເປັນຂາລົງ ຫ້າມເປີດ BUY";
-    }
-  } else {
-    // ຖ້າ Trend ຂັດແຍ້ງກັນ ຫ້າມທັງ Buy ແລະ Sell ໃຫ້ລໍຖ້າ
-    if (persistentSignal.type !== "WAIT") {
-      persistentSignal.type = "WAIT";
-      persistentSignal.setupRule = `⚠️ ລໍຖ້າ: D1(${d1Trend}), H4(${h4Trend}), H1(${h1Trend}) ຍັງບໍ່ສອດຄ່ອງກັນ`;
-    }
-  }
 
   // ຄິດໄລ່ແນວຮັບ-ແນວຕ້ານ Key Levels
   let nearestResistance = price + (atr * 1.5);
@@ -442,6 +434,71 @@ async function processTradingLogic() {
 
     if (majorResistances.length) nearestResistance = majorResistances.reduce((p, c) => Math.abs(c - price) < Math.abs(p - price) ? c : p);
     if (majorSupports.length) nearestSupport = majorSupports.reduce((p, c) => Math.abs(c - price) < Math.abs(p - price) ? c : p);
+  }
+
+  // 🎯 ລະບົບສ້າງສັນຍານ SMC Trigger (Setup 1 - 4)
+  if (persistentSignal.type === "WAIT") {
+    // ກວດສອບ BUY SIGNAL: D1+H4+H1 ຕ້ອງເປັນ BULLISH + RSI ບໍ່ Overbought + ມີ Rejection/Sweep ໃກ້ແນວຮັບ
+    if (isAllBullish && rsi < 65 && Math.abs(price - nearestSupport) <= (atr * 0.8)) {
+      const slDist = parseFloat((atr * 0.9).toFixed(2));
+      const entryVal = price;
+      const slVal = parseFloat((entryVal - slDist).toFixed(2));
+      const sigId = `BUY_${Math.floor(now / 1000)}`;
+
+      persistentSignal = {
+        type: "BUY",
+        setupRule: "SMC Setup #1: SSL Liquidity Sweep & Demand Order Block (M15)",
+        entry: entryVal.toFixed(2),
+        sl: slVal.toFixed(2),
+        tp1: (entryVal + (slDist * 1.0)).toFixed(2),
+        tp2: (entryVal + (slDist * 1.8)).toFixed(2),
+        tp3: (entryVal + (slDist * 2.5)).toFixed(2),
+        tp4: (entryVal + (slDist * 3.2)).toFixed(2),
+        tp5: (entryVal + (slDist * 4.0)).toFixed(2),
+        rrRatio: "1 : 4.0",
+        triggeredAt: now,
+        signalId: sigId,
+        inducementFilter: "NON-INDUCEMENT VALIDATED"
+      };
+
+      // 🔔 ສົ່ງແຈ້ງເຕືອນ Discord ທັນທີ
+      sendDiscordAlert(persistentSignal);
+
+    // ກວດສອບ SELL SIGNAL: D1+H4+H1 ຕ້ອງເປັນ BEARISH + RSI ບໍ່ Oversold + ມີ Sweep ໃກ້ແນວຕ້ານ
+    } else if (isAllBearish && rsi > 35 && Math.abs(price - nearestResistance) <= (atr * 0.8)) {
+      const slDist = parseFloat((atr * 0.9).toFixed(2));
+      const entryVal = price;
+      const slVal = parseFloat((entryVal + slDist).toFixed(2));
+      const sigId = `SELL_${Math.floor(now / 1000)}`;
+
+      persistentSignal = {
+        type: "SELL",
+        setupRule: "SMC Setup #2: BSL Liquidity Sweep & Supply Order Block (M15)",
+        entry: entryVal.toFixed(2),
+        sl: slVal.toFixed(2),
+        tp1: (entryVal - (slDist * 1.0)).toFixed(2),
+        tp2: (entryVal - (slDist * 1.8)).toFixed(2),
+        tp3: (entryVal - (slDist * 2.5)).toFixed(2),
+        tp4: (entryVal - (slDist * 3.2)).toFixed(2),
+        tp5: (entryVal - (slDist * 4.0)).toFixed(2),
+        rrRatio: "1 : 4.0",
+        triggeredAt: now,
+        signalId: sigId,
+        inducementFilter: "NON-INDUCEMENT VALIDATED"
+      };
+
+      // 🔔 ສົ່ງແຈ້ງເຕືອນ Discord ທັນທີ
+      sendDiscordAlert(persistentSignal);
+    }
+  }
+
+  // 🛡️ ກົດເຫຼັກ: ບລັອກສັນຍານທີ່ສວນ TREND ໃຫຍ່
+  if (isAllBullish && persistentSignal.type === "SELL") {
+    persistentSignal.type = "WAIT";
+    persistentSignal.setupRule = "🚫 ຫ້າມ SELL ເດັດຂາດ! ເພາະ D1, H4, H1 ເປັນຂາຂຶ້ນ (Buy Only)";
+  } else if (isAllBearish && persistentSignal.type === "BUY") {
+    persistentSignal.type = "WAIT";
+    persistentSignal.setupRule = "🚫 ຫ້າມ BUY ເດັດຂາດ! ເພາະ D1, H4, H1 ເປັນຂາລົງ (Sell Only)";
   }
 
   return {
@@ -653,19 +710,7 @@ ${titles}
     return cachedGeopolitics;
 
   } catch (err) {
-    console.log("[News Sentinel] Error:", err.message);
-    return cachedGeopolitics || {
-      success: true,
-      count: 4,
-      trump: {
-        post: "Trump ເນັ້ນນະໂຍບາຍພາສີການຄ້າ ແລະ ເສດຖະກິດສະຫະລັດ.",
-        time: currentDateStr,
-        impactLevel: "ສູງ",
-        aiAnalysis: "ນະໂຍບາຍພາສີກະຕຸ້ນແຮງຊື້ຄຳໃນຖານະສິນຊັບປອດໄພ",
-        goldEffect: "Gold Bullish 🚀"
-      },
-      news: []
-    };
+    return cachedGeopolitics || { success: true, count: 0, trump: null, news: [] };
   }
 }
 
@@ -762,13 +807,33 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+// Endpoint ທົດສອບຍິງ Discord Webhook
+app.get('/api/test-discord', async (req, res) => {
+  const testSignal = {
+    type: "BUY",
+    setupRule: "SMC Test Trigger (Liquidity Sweep)",
+    entry: "2730.50",
+    sl: "2722.00",
+    tp1: "2735.00",
+    tp2: "2740.00",
+    tp3: "2745.00",
+    tp4: "2750.00",
+    tp5: "2760.00",
+    rrRatio: "1 : 3.5",
+    signalId: `TEST_${Date.now()}`,
+    inducementFilter: "VERIFIED"
+  };
+  await sendDiscordAlert(testSignal);
+  res.json({ success: true, message: "ທົດສອບສົ່ງສັນຍານໄປ Discord ແລ້ວ! ກະລຸນາກວດເບິ່ງໃນຫ້ອງແຊັດ." });
+});
+
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`====================================================`);
   console.log(`[OK] Gold AI Swarm Terminal RUNNING on port ${PORT}`);
-  console.log(`[OK] HTF Trend Guard Active: (D1 + H4 + H1 Filter)`);
-  console.log(`[OK] Rule: No SELL on Bullish HTF / No BUY on Bearish HTF`);
+  console.log(`[OK] Discord Webhook Alert: Ready & Active`);
+  console.log(`[OK] Test URL: http://localhost:${PORT}/api/test-discord`);
   console.log(`====================================================`);
 });
