@@ -509,30 +509,34 @@ async function processTradingLogic() {
 }
 
 // ============================================================
-// 6. AUTO LIVE DEBATE (ພາສາລາວ 100%)
+// 6. AUTO LIVE DEBATE (ພາສາລາວ 100% - ດຶງລາຄາ Spot Gold ຕົວຈິງ)
 // ============================================================
 let debateCounter = 0;
 async function getOrGenerateLiveDebate(market) {
-  const p = market.price.toFixed(2);
+  const liveFeed = await getLivePriceFeed();
+  const p = liveFeed.price.toFixed(2);
+  const currentRsi = liveFeed.rsi || market.rsi;
+  
   const timeStr = new Date().toLocaleTimeString('lo-LA', { timeZone: 'Asia/Vientiane', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
   debateCounter++;
 
   try {
     const prompt = `ສ້າງບົດສົນທະນາສົດ (Live Debate) ຂອງ 3 AI ຜູ້ຊ່ຽວຊານດ້ານທອງຄຳ XAU/USD (ຮອບທີ ${debateCounter}):
-- ລາຄາປັດຈຸບັນ: $${p}
+- ລາຄາ Spot Gold ຕົວຈິງລ່າສຸດ: $${p}
 - HTF Trend: ${market.htfTrend}
-- RSI: ${market.rsi}
-- ສັນຍານປັດຈຸບັນ: ${market.signal.type} (Entry: $${market.signal.entry})
+- RSI: ${currentRsi}
+- ສັນຍານປັດຈຸບັນ: ${market.signal.type} (Entry: $${p})
 
 ⚠️ ກົດເຫຼັກ strictly:
-1. ຕອບເປັນ JSON Array 3 ຂໍ້ຄວາມ ພາສາລາວ (Lao Language Only) ເທົ່ານັ້ນ!
-2. ຫ້າມໃຊ້ພາສາໄທ. ຂໍ້ຄວາມຕ້ອງສົດໃຫມ່ ແລະ ປ່ຽນແປງໄປຕາມຮອບທີ ${debateCounter}.
+1. ຕ້ອງໃຊ້ລາຄາ $${p} ນີ້ເທົ່ານັ້ນໃນການສົນທະນາ, ຫ້າມໃຊ້ລາຄາເກົ່າ!
+2. ຕອບເປັນ JSON Array 3 ຂໍ້ຄວາມ ພາສາລາວ (Lao Language Only) ເທົ່ານັ້ນ!
+3. ຫ້າມໃຊ້ພາສາໄທ. ຂໍ້ຄວາມຕ້ອງສົດໃຫມ່ ແລະ ປ່ຽນແປງໄປຕາມຮອບທີ ${debateCounter}.
 
 ຮູບແບບ JSON:
 [
-  {"agent": "AI_SMC_Specialist", "badge": "mod", "color": "text-purple-400", "msg": "ວິເຄາະໂຄງສ້າງລາຄາ Spot Gold ຢູ່ທີ່ $${p} (RSI: ${market.rsi})."},
+  {"agent": "AI_SMC_Specialist", "badge": "mod", "color": "text-purple-400", "msg": "ວິເຄາະໂຄງສ້າງລາຄາ Spot Gold ຢູ່ທີ່ $${p} (RSI: ${currentRsi})."},
   {"agent": "MM_Orderflow_Hunter", "badge": "vip", "color": "text-cyan-400", "msg": "ກວດພົບ Inducement Filter: ແນວໂນ້ມ ${market.htfTrend}."},
-  {"agent": "AI_Swarm_Consensus", "badge": "bot", "color": "text-amber-400", "msg": "ມະຕິເອກະພາບ AI Swarm: ສັນຍານ ${market.signal.type} ທີ່ລາຄາ $${market.signal.entry}."}
+  {"agent": "AI_Swarm_Consensus", "badge": "bot", "color": "text-amber-400", "msg": "ມະຕິເອກະພາບ AI Swarm: ສັນຍານ ${market.signal.type} ທີ່ລາຄາ $${p}."}
 ]`;
 
     let raw = await executeTriBrainAI('groq', prompt, "You are a financial AI assistant speaking Lao fluently.");
@@ -543,9 +547,9 @@ async function getOrGenerateLiveDebate(market) {
   } catch (e) {}
 
   return [
-    { id: Date.now() + 1, time: timeStr, agent: "AI_SMC_Specialist", badge: "mod", color: "text-purple-400", message: `ວິເຄາະໂຄງສ້າງລາຄາ Spot Gold: $${p} (RSI: ${market.rsi}, ຮອບທີ ${debateCounter}).` },
+    { id: Date.now() + 1, time: timeStr, agent: "AI_SMC_Specialist", badge: "mod", color: "text-purple-400", message: `ວິເຄາະໂຄງສ້າງລາຄາ Spot Gold: $${p} (RSI: ${currentRsi}, ຮອບທີ ${debateCounter}).` },
     { id: Date.now() + 2, time: timeStr, agent: "MM_Orderflow_Hunter", badge: "vip", color: "text-cyan-400", message: `ກວດພົບ Inducement Filter: ແນວໂນ້ມ ${market.htfTrend}.` },
-    { id: Date.now() + 3, time: timeStr, agent: "AI_Swarm_Consensus", badge: "bot", color: "text-amber-400", message: `ມະຕິເອກະພາບ AI Swarm: ສັນຍານ ${market.signal.type} ທີ່ລາຄາ $${market.signal.entry}.` }
+    { id: Date.now() + 3, time: timeStr, agent: "AI_Swarm_Consensus", badge: "bot", color: "text-amber-400", message: `ມະຕິເອກະພາບ AI Swarm: ສັນຍານ ${market.signal.type} ທີ່ລາຄາ $${p}.` }
   ];
 }
 
@@ -704,8 +708,8 @@ app.get('/api/red-news', async (req, res) => {
       success: true,
       count: 2,
       data: [
-        { id: 1, title: "🔴 Core CPI m/m & y/y", time: "19:30 (ICT)", analysis: `ຄຳກຳລັງທົດສອບເຂດ $${price.toFixed(0)}.` },
-        { id: 2, title: "🔴 Non-Farm Payrolls", time: "20:30 (ICT)", analysis: `ຕິດຕາມຄວາມຜັນຜວນແຮງ.` }
+        { id: 1, title: "🔴 Core CPI m/m & y/y", date: "12/02/2026", time: "19:30 (ICT)", analysis: `ຄຳກຳລັງທົດສອບເຂດ $${price.toFixed(0)}.` },
+        { id: 2, title: "🔴 Non-Farm Payrolls", date: "13/02/2026", time: "20:30 (ICT)", analysis: `ຕິດຕາມຄວາມຜັນຜວນແຮງ.` }
       ]
     });
   } catch (e) {
