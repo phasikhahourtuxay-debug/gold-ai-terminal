@@ -41,7 +41,7 @@ async function sendDiscordAlert(signalType, entryPrice, tp5, sl) {
 // ============================================================
 // ຕັ້ງຄ່າ SMART CACHE
 // ============================================================
-const LIVE_PRICE_CACHE_MS = 150 * 1000;          // 2.5 ນາທີ
+const LIVE_PRICE_CACHE_MS = 150 * 1000;          // 2.5 ນาที
 const D1_CACHE_MS         = 7 * 24 * 3600 * 1000;// 7 ມື້
 const H4_CACHE_MS         = 24 * 3600 * 1000;    // 24 ຊົ່ວໂມງ
 const H1_CACHE_MS         = 24 * 3600 * 1000;    // 24 ຊົ່ວໂມງ
@@ -332,7 +332,7 @@ function extractFractals(candles) {
 }
 
 // ============================================================
-// 5. TRADING LOGIC & SIGNALS
+// 5. TRADING LOGIC & SIGNALS (Cooldown 2 ຊົ່ວໂມງ)
 // ============================================================
 let persistentSignal = {
   type: "WAIT",
@@ -354,19 +354,17 @@ let liquidityHuntState = {
   clearedAt: 0
 };
 
+let lastSentSignalId = null; 
+
 async function processTradingLogic() {
   const now = Date.now();
-  if (persistentSignal.type !== "WAIT" && (now - persistentSignal.triggeredAt > 20 * 60 * 1000)) {
+  
+  // ⏳ ຕັ້ງເວລາໃຫ້ສັນຍານຄົງຢູ່ 2 ຊົ່ວໂມງ (`2 * 3600 * 1000`) ກ่อนຈະຣີເຊັດ
+  if (persistentSignal.type !== "WAIT" && (now - persistentSignal.triggeredAt > 2 * 3600 * 1000)) {
     persistentSignal = {
       type: "WAIT", setupRule: "ກຳລັງຊອກຫາຈຸດ Buy-Sell ໃໝ່...",
       entry: "--", sl: "--", tp1: "--", tp2: "--", tp3: "--", tp4: "--", tp5: "--",
       rrRatio: "1 : 3.6", triggeredAt: 0, signalId: null, inducementFilter: "PASSED"
-    };
-  }
-  if (liquidityHuntState.isCleared && (now - liquidityHuntState.clearedAt > 10 * 60 * 1000)) {
-    liquidityHuntState = {
-      isCleared: false, clearedPrice: "--", liquidityType: "Scanning M15 Liquidity Pools...",
-      signalAction: "WAIT", clearedAt: 0
     };
   }
 
@@ -422,6 +420,7 @@ async function processTradingLogic() {
     const entryPrice = price;
     const slPrice = sigType === "BUY" ? entryPrice - (atr * 1.2) : entryPrice + (atr * 1.2);
     const tpDist = atr * 1.8;
+    const newSignalId = `sig_${Math.floor(now / (2 * 3600 * 1000))}`; // ປ່ຽນ ID ຕາມຮອບ 2 ຊົ່ວໂມງ
 
     persistentSignal = {
       type: sigType,
@@ -435,7 +434,7 @@ async function processTradingLogic() {
       tp5: (sigType === "BUY" ? entryPrice + (tpDist*3.6) : entryPrice - (tpDist*3.6)).toFixed(2),
       rrRatio: "1 : 3.6",
       triggeredAt: now,
-      signalId: `sig_${Math.floor(now/1000)}`,
+      signalId: newSignalId,
       inducementFilter: "PASSED"
     };
 
@@ -447,8 +446,11 @@ async function processTradingLogic() {
       clearedAt: now
     };
 
-    // ส่งแจ้งเตືອນເຂົ້າ Discord Webhook ທີ່ສ້າງຂຶ້ນ
-    await sendDiscordAlert(sigType, entryPrice.toFixed(2), persistentSignal.tp5, persistentSignal.sl);
+    // 🛡️ ປ້ອງກັນການສົ່ງແຈ້ງເຕືອນຊ້ຳໃນຮອບ 2 ຊົ່ວໂມງດຽວກັນ
+    if (lastSentSignalId !== newSignalId) {
+      lastSentSignalId = newSignalId;
+      await sendDiscordAlert(sigType, entryPrice.toFixed(2), persistentSignal.tp5, persistentSignal.sl);
+    }
   }
 
   return {
