@@ -133,6 +133,19 @@ function calculateATR(candles, period = 14) {
   return parseFloat(avg.toFixed(2));
 }
 
+// ຟັງຊັນກວດຫາ Trend ຂອງແຕ່ລະ Timeframe ໂດຍໃຊ້ Moving Average 20
+function getCandleTrend(candles) {
+  if (!candles || candles.length < 5) return 'NEUTRAL';
+  const sliceCount = Math.min(candles.length, 20);
+  const recent = candles.slice(-sliceCount);
+  const avgClose = recent.reduce((sum, c) => sum + c.close, 0) / sliceCount;
+  const lastCandle = candles[candles.length - 1];
+
+  if (lastCandle.close > avgClose && lastCandle.close >= lastCandle.open) return 'BULLISH';
+  if (lastCandle.close < avgClose && lastCandle.close <= lastCandle.open) return 'BEARISH';
+  return lastCandle.close > avgClose ? 'BULLISH' : 'BEARISH';
+}
+
 // ============================================================
 // 3. REAL-TIME SPOT GOLD PRICE FEED (Twelve Data Cache 2.5 Min)
 // ============================================================
@@ -322,7 +335,7 @@ function extractFractals(candles) {
 }
 
 // ============================================================
-// 5. TRADING LOGIC & SIGNALS (4 SMC Setups & Inducement Filter)
+// 5. TRADING LOGIC & SIGNALS (ກົດເຫຼັກ D1 + H4 + H1 FILTER)
 // ============================================================
 let persistentSignal = {
   type: "WAIT",
@@ -360,9 +373,10 @@ async function processTradingLogic() {
     };
   }
 
-  const { d1, h4, m15 } = await getMultiTimeframeCandles();
+  const { d1, h4, h1, m15 } = await getMultiTimeframeCandles();
   const { price } = await getLivePriceFeed();
 
+  // ຄິດໄລ່ RSI & ATR ຈາກ M15
   let rsi = 50.0;
   let atr = 14.0;
   if (m15 && m15.length > 15) {
@@ -375,7 +389,48 @@ async function processTradingLogic() {
     }
   }
 
-  let isD1Bullish = true;
+  // 🛡️ ກວດສອບ TREND ຂອງ D1, H4, H1 (ກົດເຫຼັກ)
+  const d1Trend = getCandleTrend(d1);
+  const h4Trend = getCandleTrend(h4);
+  const h1Trend = getCandleTrend(h1);
+
+  const isAllBullish = (d1Trend === 'BULLISH' && h4Trend === 'BULLISH' && h1Trend === 'BULLISH');
+  const isAllBearish = (d1Trend === 'BEARISH' && h4Trend === 'BEARISH' && h1Trend === 'BEARISH');
+
+  let htfStatusText = "SIDEWAY / MIXED (ລໍຖ້າ D1,H4,H1 ສອດຄ່ອງກັນ)";
+  if (isAllBullish) htfStatusText = "BULLISH (D1+H4+H1 ຂາຂຶ້ນແທ້ - BUY ONLY)";
+  else if (isAllBearish) htfStatusText = "BEARISH (D1+H4+H1 ຂາລົງແທ້ - SELL ONLY)";
+
+  // 🚫 ກົດເຫຼັກ: ບລັອກສັນຍານທີ່ສວນ TREND ໃຫຍ່
+  if (isAllBullish) {
+    // ຖ້າ D1, H4, H1 ເປັນຂາຂຶ້ນ ຫ້າມ SELL ເດັດຂາດ!
+    if (persistentSignal.type === "SELL") {
+      persistentSignal.type = "WAIT";
+      persistentSignal.setupRule = "🚫 ຫ້າມ SELL ເດັດຂາດ! ເພາະ D1, H4, H1 ເປັນຂາຂຶ້ນ (Buy Only)";
+    }
+    if (liquidityHuntState.signalAction === "SELL") {
+      liquidityHuntState.signalAction = "WAIT";
+      liquidityHuntState.liquidityType = "⚠️ ຖືກບລັອກ: D1, H4, H1 ເປັນຂາຂຶ້ນ ຫ້າມເປີດ SELL";
+    }
+  } else if (isAllBearish) {
+    // ຖ້າ D1, H4, H1 ເປັນຂາລົງ ຫ້າມ BUY ເດັດຂາດ!
+    if (persistentSignal.type === "BUY") {
+      persistentSignal.type = "WAIT";
+      persistentSignal.setupRule = "🚫 ຫ້າມ BUY ເດັດຂາດ! ເພາະ D1, H4, H1 ເປັນຂາລົງ (Sell Only)";
+    }
+    if (liquidityHuntState.signalAction === "BUY") {
+      liquidityHuntState.signalAction = "WAIT";
+      liquidityHuntState.liquidityType = "⚠️ ຖືກບລັອກ: D1, H4, H1 ເປັນຂາລົງ ຫ້າມເປີດ BUY";
+    }
+  } else {
+    // ຖ້າ Trend ຂັດແຍ້ງກັນ ຫ້າມທັງ Buy ແລະ Sell ໃຫ້ລໍຖ້າ
+    if (persistentSignal.type !== "WAIT") {
+      persistentSignal.type = "WAIT";
+      persistentSignal.setupRule = `⚠️ ລໍຖ້າ: D1(${d1Trend}), H4(${h4Trend}), H1(${h1Trend}) ຍັງບໍ່ສອດຄ່ອງກັນ`;
+    }
+  }
+
+  // ຄິດໄລ່ແນວຮັບ-ແນວຕ້ານ Key Levels
   let nearestResistance = price + (atr * 1.5);
   let nearestSupport = price - (atr * 1.5);
 
@@ -387,9 +442,6 @@ async function processTradingLogic() {
 
     if (majorResistances.length) nearestResistance = majorResistances.reduce((p, c) => Math.abs(c - price) < Math.abs(p - price) ? c : p);
     if (majorSupports.length) nearestSupport = majorSupports.reduce((p, c) => Math.abs(c - price) < Math.abs(p - price) ? c : p);
-
-    const d1Last = d1[d1.length - 1];
-    isD1Bullish = d1Last.close >= d1Last.open;
   }
 
   return {
@@ -398,7 +450,9 @@ async function processTradingLogic() {
     atr,
     nearestResistance,
     nearestSupport,
-    htfTrend: isD1Bullish ? "BULLISH (ຂາຂຶ້ນແທ້)" : "BEARISH (ຂາລົງແທ້)",
+    htfTrend: htfStatusText,
+    isAllBullish,
+    isAllBearish,
     signal: persistentSignal
   };
 }
@@ -413,8 +467,8 @@ async function getOrGenerateLiveDebate(market) {
   debateCounter++;
 
   try {
-    const prompt = `3 AI ຖົກຖຽງກັນກ່ຽວກັບທອງຄຳ XAU/USD (HTF: ${market.htfTrend}, RSI: ${market.rsi}, ລາຄາປັດຈຸບັນ: $${p}):
-ສັນຍານປັດຈຸບັນ: [${persistentSignal.type} - ${persistentSignal.setupRule}]
+    const prompt = `3 AI ຖົກຖຽງກັນກ່ຽວກັບທອງຄຳ XAU/USD (HTF: ${market.htfTrend}, RSI: ${market.rsi}, ລາຄາ: $${p}):
+ກົດເຫຼັກ: ຖ້າ HTF ເປັນຂາຂຶ້ນ (BULLISH) ຫ້າມແນະນຳ SELL ເດັດຂາດ! ຖ້າເປັນຂາລົງ (BEARISH) ຫ້າມແນະນຳ BUY ເດັດຂາດ!
 ຕອບເປັນ JSON Array 3 ຂໍ້ຄວາມສັ້ນໆ ພາສາລາວ:
 [
   {"agent": "AI_SMC_Specialist", "badge": "mod", "color": "text-purple-400", "msg": "..."},
@@ -430,19 +484,14 @@ async function getOrGenerateLiveDebate(market) {
 
   const dynamicMsgs = [
     [
-      `ກວດສອບລາຄາ Live ປັດຈຸບັນທີ່ $${p}. ແນວຮັບ SSL ຄື $${market.nearestSupport.toFixed(2)}, ແນວຕ້ານ BSL ຄື $${market.nearestResistance.toFixed(2)}.`,
-      `Orderflow ເຫັນແຮງຊື້-ຂາຍສົມດຸນ, ຍັງບໍ່ພົບສັນຍານ Inducement ຫຼອກລວງ.`,
-      `Swarm 1M Agents: ຮັກສາສະຖານະ [${persistentSignal.type}], RSI ຢູ່ທີ່ ${market.rsi}.`
+      `ກວດສອບໂຄງສ້າງ HTF: ${market.htfTrend}. ລາຄາປັດຈຸບັນ $${p}.`,
+      `MM Orderflow: ຢຶດຕາມກົດເຫຼັກ Trend Following! ຫ້າມເປີດອໍເດີສວນແນວໂນ້ມ D1+H4+H1 ເດັດຂາດ.`,
+      `AI Swarm Consensus: ຮັກສາສະຖານະ [${persistentSignal.type}], RSI ຢູ່ທີ່ ${market.rsi}.`
     ],
     [
-      `ກາຟ M15 ກຳລັງທົດສອບໂຄງສ້າງລາຄາ $${p}. ໂຄງສ້າງ HTF ຍັງຄົງເປັນ ${market.htfTrend}.`,
-      `ກວດພົບສະພາບຄ່ອງ Liquidity Pool ໃກ້ເຂດ $${(market.nearestResistance).toFixed(2)}. ລໍຖ້າ Sweep High.`,
-      `AI Swarm Consensus: ຢືນຢັນລໍຖ້າຈຸດເຂົ້າທີ່ໄດ້ປຽບ (High R:R Ratio).`
-    ],
-    [
-      `ລາຄາ $${p} ກຳລັງເຄື່ອນໄຫວໃນກອບ. ຖານຂໍ້ມູນ Multi-Timeframe Scan ຫາ Key Zones.`,
-      `MM Orderflow: ຍັງບໍ່ມີແຮງກະຊາກຂອງເຈົ້າຕະຫຼາດ, ໃຫ້ລໍຖ້າຈົນກວ່າຈະເກີດ Sweep ແທ້.`,
-      `Swarm AI: ສະຖານະການລົງທຶນ [${persistentSignal.type}] | ລະບົບປ້ອງກັນ Inducement ເຮັດວຽກປົກກະຕິ.`
+      `ກາຟ M15 ກຳລັງເຄື່ອນໄຫວ. ສະຖານະໂຄງສ້າງໃຫຍ່ຄື: ${market.htfTrend}.`,
+      `Orderflow Hunter: ຖ້າ Trend ໃຫຍ່ເປັນຂາຂຶ້ນໃຫ້ຫາສະເພາະຈຸດ BUY, ຖ້າເປັນຂາລົງໃຫ້ຫາສະເພາະຈຸດ SELL.`,
+      `AI Swarm: ລະບົບປ້ອງກັນ Inducement & Trend Guard ເຮັດວຽກປົກກະຕິ.`
     ]
   ];
 
@@ -490,7 +539,6 @@ async function fetchRealGeopoliticsAndTrump() {
   const currentDateStr = new Date().toLocaleDateString('lo-LA', { timeZone: 'Asia/Vientiane' });
 
   try {
-    // ⭐️ ດຶງຂ່າວຜ່ານ CNBC US Economy & Finance (ບໍ່ບລັອກ Cloud/Render 100%)
     const cnbcEconomyUrl = "https://www.cnbc.com/id/20910258/device/rss/rss.html";
     const cnbcFinanceUrl = "https://www.cnbc.com/id/10000664/device/rss/rss.html";
 
@@ -502,7 +550,6 @@ async function fetchRealGeopoliticsAndTrump() {
     const allXml = (ecoRes.data || '') + '\n' + (finRes.data || '');
     let allItems = parseRSSXml(allXml).filter(item => (now - item.pubDate) <= SEVEN_DAYS_MS);
 
-    // 1. ຊອກຫາຂ່າວ Trump ຈາກສຳນັກຂ່າວ
     let trumpStory = allItems.find(i => /trump|tariff|trade|tax|white house/i.test(i.title + " " + i.desc));
     let trumpData = null;
 
@@ -524,7 +571,6 @@ async function fetchRealGeopoliticsAndTrump() {
       } catch (e) {}
     }
 
-    // ຖ້າບໍ່ພົບຂ່າວ Trump ໂດຍກົງໃນ CNBC ມື້ນີ້ ໃຫ້ AI ສະຫຼຸບນະໂຍບາຍລ່າສຸດ
     if (!trumpData) {
       trumpData = {
         post: "Trump ເນັ້ນມາດຕະການພາສີການຄ້າສະຫະລັດ ແລະ ຈີນ ສ້າງຄວາມຜັນຜວນໃຫ້ຕະຫຼາດການເງິນໂລກ.",
@@ -535,7 +581,6 @@ async function fetchRealGeopoliticsAndTrump() {
       };
     }
 
-    // 2. ຈັດການ 4 ຂ່າວດ່ວນລະດັບໂລກ (CNBC News)
     let processedNews = [];
     const macroStories = allItems.slice(0, 4);
 
@@ -565,7 +610,6 @@ ${titles}
       } catch (e) {}
     }
 
-    // 🛡️ ຖ້າ CNBC RSS ຍັງບໍ່ມີຂ່າວ ໃຫ້ AI ສ້າງ 4 ຂ່າວ Macro ສົດໆປະຈຳສັບປະດາທັນທີ (ຮັບປະກັນບໍ່ມີວັນເປັນ 0)
     if (!processedNews || processedNews.length === 0) {
       processedNews = [
         {
@@ -606,7 +650,6 @@ ${titles}
       news: processedNews
     };
     lastGeopoliticsFetch = now;
-    console.log(`[News Sentinel] Live News Updated (${processedNews.length} articles active)`);
     return cachedGeopolitics;
 
   } catch (err) {
@@ -725,7 +768,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`====================================================`);
   console.log(`[OK] Gold AI Swarm Terminal RUNNING on port ${PORT}`);
-  console.log(`[OK] Spot Gold: Twelve Data (Smart Cache 150s)`);
-  console.log(`[OK] Real US News (CNBC + AI Macro Sentinel) Active`);
+  console.log(`[OK] HTF Trend Guard Active: (D1 + H4 + H1 Filter)`);
+  console.log(`[OK] Rule: No SELL on Bullish HTF / No BUY on Bearish HTF`);
   console.log(`====================================================`);
 });
