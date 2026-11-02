@@ -12,6 +12,15 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
 // ============================================================
+// ຕັ້ງຄ່າເວລາ SMART CACHE (ຄິດໄລ່ໃຫ້ລັນໄດ້ 24/7 ບໍ່ເກີນ 800 calls/ມື້)
+// ============================================================
+const LIVE_PRICE_CACHE_MS = 2 * 60 * 1000;       // 2 ນາທີ (720 calls/ມື້ = ປອດໄພ 100%)
+const D1_CACHE_MS         = 7 * 24 * 3600 * 1000;// 7 ມື້ (1 ອາທິດດຶງ 1 ຄັ້ງ)
+const H4_CACHE_MS         = 24 * 3600 * 1000;    // 24 ຊົ່ວໂມງ (1 ມື້ດຶງ 1 ຄັ້ງ)
+const H1_CACHE_MS         = 24 * 3600 * 1000;    // 24 ຊົ່ວໂມງ (1 ມື້ດຶງ 1 ຄັ້ງ)
+const M15_CACHE_MS        = 15 * 60 * 1000;      // 15 ນາທີ (ດຶງເມື່ອແທ່ງ M15 ປິດ)
+
+// ============================================================
 // 1. TRI-BRAIN AI CLIENTS (Groq + Gemini + OpenRouter)
 // ============================================================
 const groqClient = new OpenAI({
@@ -123,15 +132,16 @@ function calculateATR(candles, period = 14) {
 }
 
 // ============================================================
-// 3. REAL-TIME GOLD PRICE FEED (Twelve Data + Smart Cache)
+// 3. REAL-TIME GOLD PRICE FEED (Twelve Data + Smart Cache 2 Min)
 // ============================================================
 let cachedLiveFeed = null;
 let lastLiveFetch = 0;
 
 async function getLivePriceFeed() {
   const now = Date.now();
-  // Cache ລາຄາໄວ້ 10 ວິນາທີ ເພື່ອບໍ່ໃຫ້ເກີນໂກຕາ 8 calls/min ຂອງ Twelve Data
-  if (cachedLiveFeed && (now - lastLiveFetch < 10000) && cachedLiveFeed.price > 1000) {
+
+  // ຖ້າຍັງບໍ່ກາຍ 2 ນາທີ ໃຫ້ສົ່ງຄ່າໃນ Cache ທັນທີ ບໍ່ຍິງ API ຊ້ຳ
+  if (cachedLiveFeed && (now - lastLiveFetch < LIVE_PRICE_CACHE_MS) && cachedLiveFeed.price > 1000) {
     return cachedLiveFeed;
   }
 
@@ -139,25 +149,26 @@ async function getLivePriceFeed() {
   let rsi = cachedLiveFeed?.rsi || 50.0;
   let atr = cachedLiveFeed?.atr || 14.0;
 
-  // ⭐️ ແຫຼ່ງທີ 1: TWELVE DATA API (Spot Gold XAU/USD ແທ້ໆຄືກັບ TradingView)
+  // ⭐️ ແຫຼ່ງທີ 1: TWELVE DATA API (Spot Gold XAU/USD ແທ້ໆ)
   const tdKey = (process.env.TWELVE_DATA_API_KEY || "").trim();
   if (tdKey) {
     try {
       const tdRes = await axios.get(`https://api.twelvedata.com/price?symbol=XAU/USD&apikey=${tdKey}`, { timeout: 4000 });
       if (tdRes.data && tdRes.data.price && !isNaN(parseFloat(tdRes.data.price))) {
         price = parseFloat(parseFloat(tdRes.data.price).toFixed(2));
+        console.log(`[Twelve Data] Price Updated: $${price} at ${new Date().toLocaleTimeString('lo-LA', { timeZone: 'Asia/Vientiane' })}`);
       }
     } catch (e) {
-      console.log("[TwelveData] Request Error:", e.message);
+      console.log("[Twelve Data] Error/Rate Limit:", e.message);
     }
   }
 
-  // ແຫຼ່ງທີ 2: GoldPrice.org (Spot Gold ທົ່ວໂລກ)
+  // ແຫຼ່ງທີ 2: GoldPrice.org (ສຳຮອງເມື່ອ Twelve Data ຕິດ Limit)
   if (!price || price < 1500) {
     try {
       const gpRes = await axios.get('https://data-asg.goldprice.org/dbXRates/USD', {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
           'Accept': 'application/json'
         },
         timeout: 3000
@@ -168,7 +179,7 @@ async function getLivePriceFeed() {
     } catch (e) {}
   }
 
-  // ແຫຼ່ງທີ 3: Yahoo Finance (ດຶງແທ່ງທຽນມາຄິດໄລ່ RSI & ATR)
+  // ແຫຼ່ງທີ 3: Yahoo Finance (ຄິດໄລ່ RSI & ATR)
   try {
     const yRes = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=15m&range=2d', {
       headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -206,16 +217,6 @@ async function getLivePriceFeed() {
     }
   } catch (e) {}
 
-  // ແຫຼ່ງທີ 4: Fallback Pax Gold (CoinGecko / Kraken)
-  if (!price || price < 1500) {
-    try {
-      const cgRes = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=pax-gold&vs_currencies=usd', { timeout: 3000 });
-      if (cgRes.data?.['pax-gold']?.usd) {
-        price = parseFloat(cgRes.data['pax-gold'].usd.toFixed(2));
-      }
-    } catch (e) {}
-  }
-
   if (price && price > 1000) {
     cachedLiveFeed = { price, rsi, atr };
     lastLiveFetch = now;
@@ -226,13 +227,16 @@ async function getLivePriceFeed() {
   return cachedLiveFeed;
 }
 
-// Multi-Timeframe Candles Cache
+// ============================================================
+// 4. MULTI-TIMEFRAME CANDLES (D1=7ມື້, H4/H1=24Hr, M15=15Min)
+// ============================================================
 let cacheD1 = { data: [], lastFetch: 0 };
 let cacheH4 = { data: [], lastFetch: 0 };
 let cacheH1 = { data: [], lastFetch: 0 };
 let cacheM15 = { data: [], lastFetch: 0 };
 
 async function fetchCandles(interval, count) {
+  // ດຶງຜ່ານ Yahoo Finance ຟຣີ ບໍ່ກິນໂກຕາ Twelve Data
   try {
     const yahooIntervalMap = { '1day': '1d', '4h': '1h', '1h': '1h', '15min': '15m' };
     const yInt = yahooIntervalMap[interval] || '15m';
@@ -260,6 +264,7 @@ async function fetchCandles(interval, count) {
     }
   } catch (e) {}
 
+  // Fallback ດ້ວຍ Binance PAXGUSDT ຟຣີ
   try {
     const binanceIntervalMap = { '1day': '1d', '4h': '4h', '1h': '1h', '15min': '15m' };
     const bInterval = binanceIntervalMap[interval] || '15m';
@@ -281,22 +286,47 @@ async function fetchCandles(interval, count) {
 
 async function getMultiTimeframeCandles() {
   const now = Date.now();
-  if (!cacheD1.data.length || (now - cacheD1.lastFetch > 7 * 24 * 3600 * 1000)) {
+
+  // D1: ດຶງ 1 ຄັ້ງຕໍ່ອາທິດ (7 ມື້)
+  if (!cacheD1.data.length || (now - cacheD1.lastFetch > D1_CACHE_MS)) {
     const d1 = await fetchCandles('1day', 22);
-    if (d1.length) { cacheD1.data = d1; cacheD1.lastFetch = now; }
+    if (d1.length) { 
+      cacheD1.data = d1; 
+      cacheD1.lastFetch = now; 
+      console.log("[Smart Cache] D1 Candles Updated (1 Week)"); 
+    }
   }
-  if (!cacheH4.data.length || (now - cacheH4.lastFetch > 24 * 3600 * 1000)) {
+
+  // H4: ດຶງ 1 ຄັ້ງຕໍ່ມື້ (24 ຊົ່ວໂມງ)
+  if (!cacheH4.data.length || (now - cacheH4.lastFetch > H4_CACHE_MS)) {
     const h4 = await fetchCandles('4h', 120);
-    if (h4.length) { cacheH4.data = h4; cacheH4.lastFetch = now; }
+    if (h4.length) { 
+      cacheH4.data = h4; 
+      cacheH4.lastFetch = now; 
+      console.log("[Smart Cache] H4 Candles Updated (24 Hours)"); 
+    }
   }
-  if (!cacheH1.data.length || (now - cacheH1.lastFetch > 24 * 3600 * 1000)) {
+
+  // H1: ດຶງ 1 ຄັ້ງຕໍ່ມື້ (24 ຊົ່ວໂມງ)
+  if (!cacheH1.data.length || (now - cacheH1.lastFetch > H1_CACHE_MS)) {
     const h1 = await fetchCandles('1h', 200);
-    if (h1.length) { cacheH1.data = h1; cacheH1.lastFetch = now; }
+    if (h1.length) { 
+      cacheH1.data = h1; 
+      cacheH1.lastFetch = now; 
+      console.log("[Smart Cache] H1 Candles Updated (24 Hours)"); 
+    }
   }
-  if (!cacheM15.data.length || (now - cacheM15.lastFetch > 24 * 3600 * 1000)) {
+
+  // M15: ດຶງທຸກໆ 15 ນາທີ ເພື່ອວິເຄາະຫາສັນຍານ Buy/Sell ໃໝ່
+  if (!cacheM15.data.length || (now - cacheM15.lastFetch > M15_CACHE_MS)) {
     const m15 = await fetchCandles('15min', 1000);
-    if (m15.length) { cacheM15.data = m15; cacheM15.lastFetch = now; }
+    if (m15.length) { 
+      cacheM15.data = m15; 
+      cacheM15.lastFetch = now; 
+      console.log("[Smart Cache] M15 Candles Updated (15 Mins)"); 
+    }
   }
+
   return { d1: cacheD1.data, h4: cacheH4.data, h1: cacheH1.data, m15: cacheM15.data };
 }
 
@@ -315,7 +345,9 @@ function extractFractals(candles) {
   return { highs, lows };
 }
 
-// Trading Signal States
+// ============================================================
+// 5. TRADING LOGIC & SIGNALS (4 SMC Setups & Inducement Filter)
+// ============================================================
 let persistentSignal = {
   type: "WAIT",
   setupRule: "ກຳລັງຊອກຫາຈຸດ Buy-Sell ໃໝ່...",
@@ -383,7 +415,9 @@ async function processTradingLogic() {
   };
 }
 
-// ຫ້ອງຖົກຖຽງ: ສົ່ງຂໍ້ຄວາມວິເຄາະທຸກໆ 1 ນາທີ
+// ============================================================
+// 6. AUTO LIVE DEBATE (1-MINUTE INTERVAL)
+// ============================================================
 let debateCounter = 0;
 async function getOrGenerateLiveDebate(market) {
   const p = market.price.toFixed(2);
@@ -433,7 +467,7 @@ async function getOrGenerateLiveDebate(market) {
 }
 
 // ============================================================
-// 4. API ENDPOINTS
+// 7. API ENDPOINTS
 // ============================================================
 app.get('/api/analysis', async (req, res) => {
   try {
@@ -537,7 +571,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`====================================================`);
   console.log(`[OK] Gold AI Swarm Terminal RUNNING on port ${PORT}`);
-  console.log(`[OK] Live Spot Gold (Twelve Data + Smart Cache 10s)`);
-  console.log(`[OK] Debate Interval: 1 Minute per round`);
+  console.log(`[OK] Spot Gold: Twelve Data (Smart Cache 2m - 720 calls/day)`);
+  console.log(`[OK] Multi-TF Cache: D1=7Days, H4/H1=24Hours, M15=15Mins`);
   console.log(`====================================================`);
 });
