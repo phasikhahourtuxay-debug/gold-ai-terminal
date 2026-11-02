@@ -39,7 +39,6 @@ let liquidityHuntState = {
 
 let lastSentSignalId = null;
 
-// โຫຼດຂໍ້ມູນສະຖານະເກົ່າ (ຖ້າມີ)
 function loadPersistentState() {
   try {
     if (fs.existsSync(STATE_FILE)) {
@@ -55,7 +54,6 @@ function loadPersistentState() {
   }
 }
 
-// บันทึกສະຖານະປັດຈຸບັນ
 function savePersistentState() {
   try {
     const dataToSave = {
@@ -233,7 +231,7 @@ function getCandleTrend(candles) {
 }
 
 // ============================================================
-// 3. REAL-TIME SPOT GOLD PRICE FEED (WITH ROBUST FALLBACKS)
+// 3. REAL-TIME SPOT GOLD PRICE FEED
 // ============================================================
 let cachedLiveFeed = null;
 let lastLiveFetch = 0;
@@ -392,7 +390,7 @@ function extractFractals(candles) {
 }
 
 // ============================================================
-// 5. TRADING LOGIC & SIGNALS (Cooldown 2 ຊົ່ວໂມງ & Persistent Saving)
+// 5. TRADING LOGIC & SIGNALS (Cooldown 2 ຊົ່ວໂມງ)
 // ============================================================
 async function processTradingLogic() {
   const now = Date.now();
@@ -509,7 +507,7 @@ async function processTradingLogic() {
 }
 
 // ============================================================
-// 6. AUTO LIVE DEBATE (ພາສາລາວ 100%)
+// 6. AUTO LIVE DEBATE
 // ============================================================
 let debateCounter = 0;
 async function getOrGenerateLiveDebate(market) {
@@ -550,7 +548,7 @@ async function getOrGenerateLiveDebate(market) {
 }
 
 // ============================================================
-// 7. REAL GEOPOLITICS & NEWS (AUTO PURGE > 7 ມື້)
+// 7. REAL GEOPOLITICS & NEWS
 // ============================================================
 let cachedGeopolitics = null;
 let lastGeopoliticsFetch = 0;
@@ -704,8 +702,20 @@ app.get('/api/red-news', async (req, res) => {
       success: true,
       count: 2,
       data: [
-        { id: 1, title: "🔴 Core CPI m/m & y/y", time: "19:30 (ICT)", analysis: `ຄຳກຳລັງທົດສອບເຂດ $${price.toFixed(0)}.` },
-        { id: 2, title: "🔴 Non-Farm Payrolls", time: "20:30 (ICT)", analysis: `ຕິດຕາມຄວາມຜັນຜວນແຮງ.` }
+        { 
+          id: 1, 
+          title: "🔴 Core CPI m/m & y/y", 
+          date: "12/02/2026", 
+          time: "19:30 (ICT)", 
+          analysis: `ຄຳກຳລັງທົດສອບເຂດ $${price.toFixed(0)}.` 
+        },
+        { 
+          id: 2, 
+          title: "🔴 Non-Farm Payrolls", 
+          date: "13/02/2026", 
+          time: "20:30 (ICT)", 
+          analysis: `ຕິດຕາມຄວາມຜັນຜວນແຮງ.` 
+        }
       ]
     });
   } catch (e) {
