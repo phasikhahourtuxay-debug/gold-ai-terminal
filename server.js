@@ -704,8 +704,8 @@ app.get('/api/red-news', async (req, res) => {
       success: true,
       count: 2,
       data: [
-        { id: 1, title: "🔴 Core CPI m/m & y/y", date: "12/02/2026", time: "19:30 (ICT)", analysis: `ຄຳກຳລັງທົດສອບເຂດ $${price.toFixed(0)}.` },
-        { id: 2, title: "🔴 Non-Farm Payrolls", date: "13/02/2026", time: "20:30 (ICT)", analysis: `ຕິດຕາມຄວາມຜັນຜວນແຮງ.` }
+        { id: 1, title: "🔴 Core CPI m/m & y/y", time: "19:30 (ICT)", analysis: `ຄຳກຳລັງທົດສອບເຂດ $${price.toFixed(0)}.` },
+        { id: 2, title: "🔴 Non-Farm Payrolls", time: "20:30 (ICT)", analysis: `ຕິດຕາມຄວາມຜັນຜວນແຮງ.` }
       ]
     });
   } catch (e) {
