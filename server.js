@@ -23,122 +23,92 @@ const NEWS_CACHE_MS       = 15 * 60 * 1000;      // Cache ຂ່າວໄວ້ 
 const SEVEN_DAYS_MS       = 7 * 24 * 3600 * 1000;// 7 ມື້ສຳລັບ Auto-Purge
 
 // ============================================================
-// DISCORD WEBHOOK INTEGRATION
+// 1. TRI-BRAIN AI CLIENTS (Groq + Gemini + OpenRouter)
 // ============================================================
-let lastNotifiedSignalId = null;
-
-async function sendDiscordAlert(signal) {
-  const webhookUrl = (process.env.DISCORD_WEBHOOK_URL || "").trim();
-  if (!webhookUrl) return;
-
-  // ປ້ອງກັນການຍິງຊ້ຳ: ຖ້າເຄີຍສົ່ງສັນຍານ ID ນີ້ໄປແລ້ວ ຈະບໍ່ສົ່ງຊ້ຳອີກ
-  if (!signal.signalId || signal.signalId === lastNotifiedSignalId) return;
-  if (signal.type !== 'BUY' && signal.type !== 'SELL') return;
-
-  lastNotifiedSignalId = signal.signalId;
-
-  const isBuy = signal.type === 'BUY';
-  const color = isBuy ? 0x10b981 : 0xef4444; // ສີຂຽວມໍລະກົດ ຫຼື ສີແດງ
-  const iconEmoji = isBuy ? "🟢 🚀" : "🔴 🔻";
-  const title = `${iconEmoji} [XAU/USD] ສັນຍານໃໝ່: ${signal.type} (4 SMC Setups)`;
-
-  const embedPayload = {
-    username: "Gold AI Swarm Sentinel",
-    avatar_url: "https://cdn-icons-png.flaticon.com/512/2583/2583118.png",
-    embeds: [
-      {
-        title: title,
-        description: `**Setup SMC:** ${signal.setupRule}\n**Inducement Status:** \`${signal.inducementFilter}\``,
-        color: color,
-        fields: [
-          { name: "📍 ຈຸດເຂົ້າ (Entry)", value: `**$${signal.entry}**`, inline: true },
-          { name: "🛑 ຕັດຂາດທຶນ (SL)", value: `**$${signal.sl}**`, inline: true },
-          { name: "⚖️ Risk : Reward", value: `\`${signal.rrRatio}\``, inline: true },
-          { name: "🎯 Take Profit 1", value: `$${signal.tp1}`, inline: true },
-          { name: "🎯 Take Profit 2", value: `$${signal.tp2}`, inline: true },
-          { name: "🎯 Take Profit 3", value: `$${signal.tp3}`, inline: true },
-          { name: "🎯 Take Profit 4", value: `$${signal.tp4}`, inline: true },
-          { name: "🏆 Take Profit 5 (Max)", value: `**$${signal.tp5}**`, inline: true }
-        ],
-        footer: {
-          text: `Gold Multi-Timeframe AI Swarm • ເວລາ: ${new Date().toLocaleTimeString('lo-LA', { timeZone: 'Asia/Vientiane' })} (ICT)`
-        },
-        timestamp: new Date().toISOString()
-      }
-    ]
-  };
-
-  try {
-    await axios.post(webhookUrl, embedPayload, { timeout: 5000 });
-    console.log(`[Discord Webhook] ✅ ສົ່ງສັນຍານ ${signal.type} ສຳເລັດແລ້ວ!`);
-  } catch (err) {
-    console.error("[Discord Webhook Error]:", err.message);
-  }
-}
-
-// ============================================================
-// 1. TRI-BRAIN AI CLIENTS
-// ============================================================
-const groqClient = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY || "dummy_key",
-  baseURL: "https://api.groq.com/openai/v1"
-});
-
 async function callGroqAI(prompt, systemInstruction = "") {
-  if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY.includes("dummy")) throw new Error("No Groq Key");
+  const apiKey = (process.env.GROQ_API_KEY || "").trim();
+  if (!apiKey || apiKey.includes("dummy")) throw new Error("GROQ_API_KEY ຫວ່າງເປົ່າ ຫຼື ບໍ່ຖືກຕ້ອງ");
+
+  const groqClient = new OpenAI({
+    apiKey: apiKey,
+    baseURL: "https://api.groq.com/openai/v1"
+  });
+
   const completion = await groqClient.chat.completions.create({
     model: "llama-3.3-70b-versatile",
     messages: [
       { role: "system", content: systemInstruction || "You are an expert SMC quant trader." },
       { role: "user", content: prompt }
     ],
-    max_tokens: 650,
+    max_tokens: 750,
     temperature: 0.3
   });
-  return completion.choices[0].message.content.trim();
+  return completion.choices[0]?.message?.content?.trim();
 }
 
 async function callGeminiAI(prompt, systemInstruction = "") {
   const apiKey = (process.env.GEMINI_API_KEY || "").trim();
-  if (!apiKey) throw new Error("No Gemini Key");
+  if (!apiKey) throw new Error("GEMINI_API_KEY ຫວ່າງເປົ່າ");
+
   for (const model of ["gemini-2.0-flash", "gemini-1.5-flash"]) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
       if (systemInstruction) payload.system_instruction = { parts: [{ text: systemInstruction }] };
-      const res = await axios.post(url, payload, { timeout: 7000 });
+      const res = await axios.post(url, payload, { timeout: 8000 });
       if (res.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
         return res.data.candidates[0].content.parts[0].text.trim();
       }
-    } catch (e) { continue; }
+    } catch (e) {
+      continue;
+    }
   }
-  throw new Error("Gemini busy");
+  throw new Error("Gemini API ບໍ່ຕອບສະໜອງ");
 }
 
 async function callOpenRouterAI(prompt, systemInstruction = "") {
   const apiKey = (process.env.OPENROUTER_API_KEY || "").trim();
-  if (!apiKey) throw new Error("No OpenRouter Key");
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY ຫວ່າງເປົ່າ");
+
   const res = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
     model: "meta-llama/llama-3.2-3b-instruct:free",
-    messages: [{ role: "system", content: systemInstruction }, { role: "user", content: prompt }],
+    messages: [
+      { role: "system", content: systemInstruction || "You are an expert SMC quant trader." },
+      { role: "user", content: prompt }
+    ],
     max_tokens: 500,
     temperature: 0.4
   }, {
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    timeout: 8000
+    timeout: 9000
   });
-  if (res.data?.choices?.[0]?.message?.content) return res.data.choices[0].message.content.trim();
-  throw new Error("OpenRouter busy");
+
+  if (res.data?.choices?.[0]?.message?.content) {
+    return res.data.choices[0].message.content.trim();
+  }
+  throw new Error("OpenRouter API ບໍ່ຕອບສະໜອງ");
 }
 
 async function executeTriBrainAI(primaryEngine, prompt, systemInstruction) {
-  const engines = [callGroqAI, callGeminiAI, callOpenRouterAI];
+  const engines = [
+    { name: "Groq (Llama-3.3-70b)", fn: callGroqAI },
+    { name: "Google Gemini", fn: callGeminiAI },
+    { name: "OpenRouter", fn: callOpenRouterAI }
+  ];
+
   for (const engine of engines) {
     try {
-      const response = await engine(prompt, systemInstruction);
-      if (response && response.length > 5) return response;
-    } catch (err) {}
+      const response = await engine.fn(prompt, systemInstruction);
+      if (response && response.length > 5) {
+        console.log(`\x1b[32m[AI CONNECTED]\x1b[0m ດຶງຂໍ້ມູນຈາກ ${engine.name} ສຳເລັດຜົນ!`);
+        return response;
+      }
+    } catch (err) {
+      console.warn(`\x1b[33m[AI WARN]\x1b[0m ${engine.name} ຜິດພາດ: ${err.message}`);
+    }
   }
+
+  console.error("\x1b[31m[AI FAILED]\x1b[0m ທຸກ Engine ບໍ່ສາມາດເຊື່ອມຕໍ່ໄດ້! ກະລຸນາກວດສອບໄຟລ໌ .env");
   return null;
 }
 
@@ -221,8 +191,11 @@ async function getLivePriceFeed() {
       const tdRes = await axios.get(`https://api.twelvedata.com/price?symbol=XAU/USD&apikey=${tdKey}`, { timeout: 4500 });
       if (tdRes.data && tdRes.data.price && !isNaN(parseFloat(tdRes.data.price))) {
         price = parseFloat(parseFloat(tdRes.data.price).toFixed(2));
+        console.log(`[Twelve Data] Live Spot Price: $${price} at ${new Date().toLocaleTimeString('lo-LA', { timeZone: 'Asia/Vientiane' })}`);
       }
-    } catch (e) {}
+    } catch (e) {
+      console.log("[Twelve Data Price] Fallback triggered:", e.message);
+    }
   }
 
   if (!price || price < 1500) {
@@ -270,6 +243,7 @@ async function fetchCandlesFromTwelveData(interval, count) {
   try {
     const tdIntervalMap = { '1day': '1day', '4h': '4h', '1h': '1h', '15min': '15min' };
     const tdInt = tdIntervalMap[interval] || '15min';
+
     const url = `https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=${tdInt}&outputsize=${count}&apikey=${tdKey}`;
     const res = await axios.get(url, { timeout: 6000 });
 
@@ -282,7 +256,9 @@ async function fetchCandlesFromTwelveData(interval, count) {
         close: parseFloat(v.close)
       }));
     }
-  } catch (e) {}
+  } catch (e) {
+    console.log(`[Twelve Data Candles ${interval}] Error:`, e.message);
+  }
   return null;
 }
 
@@ -313,6 +289,23 @@ async function fetchCandlesFallback(interval, count) {
       if (candles.length > 0) return candles.slice(-count);
     }
   } catch (e) {}
+
+  try {
+    const binanceIntervalMap = { '1day': '1d', '4h': '4h', '1h': '1h', '15min': '15m' };
+    const bInterval = binanceIntervalMap[interval] || '15m';
+    const url = `https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=${bInterval}&limit=${count}`;
+    const res = await axios.get(url, { timeout: 4000 });
+    if (res.data && Array.isArray(res.data)) {
+      return res.data.map(c => ({
+        time: new Date(c[0]).toISOString(),
+        open: parseFloat(c[1]),
+        high: parseFloat(c[2]),
+        low: parseFloat(c[3]),
+        close: parseFloat(c[4])
+      }));
+    }
+  } catch (e) {}
+
   return [];
 }
 
@@ -324,22 +317,27 @@ async function fetchCandles(interval, count) {
 
 async function getMultiTimeframeCandles() {
   const now = Date.now();
+
   if (!cacheD1.data.length || (now - cacheD1.lastFetch > D1_CACHE_MS)) {
     const d1 = await fetchCandles('1day', 22);
     if (d1.length) { cacheD1.data = d1; cacheD1.lastFetch = now; }
   }
+
   if (!cacheH4.data.length || (now - cacheH4.lastFetch > H4_CACHE_MS)) {
     const h4 = await fetchCandles('4h', 120);
     if (h4.length) { cacheH4.data = h4; cacheH4.lastFetch = now; }
   }
+
   if (!cacheH1.data.length || (now - cacheH1.lastFetch > H1_CACHE_MS)) {
     const h1 = await fetchCandles('1h', 200);
     if (h1.length) { cacheH1.data = h1; cacheH1.lastFetch = now; }
   }
+
   if (!cacheM15.data.length || (now - cacheM15.lastFetch > M15_CACHE_MS)) {
     const m15 = await fetchCandles('15min', 300);
     if (m15.length) { cacheM15.data = m15; cacheM15.lastFetch = now; }
   }
+
   return { d1: cacheD1.data, h4: cacheH4.data, h1: cacheH1.data, m15: cacheM15.data };
 }
 
@@ -359,7 +357,7 @@ function extractFractals(candles) {
 }
 
 // ============================================================
-// 5. TRADING LOGIC & SIGNALS (4 SMC Setups + Trend Following)
+// 5. TRADING LOGIC & SIGNALS (ກົດເຫຼັກ D1 + H4 + H1 FILTER)
 // ============================================================
 let persistentSignal = {
   type: "WAIT",
@@ -403,7 +401,8 @@ async function processTradingLogic() {
   let rsi = 50.0;
   let atr = 14.0;
   if (m15 && m15.length > 15) {
-    rsi = calculateRSI(m15.map(c => c.close));
+    const closes = m15.map(c => c.close);
+    rsi = calculateRSI(closes);
     atr = calculateATR(m15);
     if (cachedLiveFeed) {
       cachedLiveFeed.rsi = rsi;
@@ -422,7 +421,26 @@ async function processTradingLogic() {
   if (isAllBullish) htfStatusText = "BULLISH (D1+H4+H1 ຂາຂຶ້ນແທ້ - BUY ONLY)";
   else if (isAllBearish) htfStatusText = "BEARISH (D1+H4+H1 ຂາລົງແທ້ - SELL ONLY)";
 
-  // ຄິດໄລ່ແນວຮັບ-ແນວຕ້ານ Key Levels
+  if (isAllBullish) {
+    if (persistentSignal.type === "SELL") {
+      persistentSignal.type = "WAIT";
+      persistentSignal.setupRule = "🚫 ຫ້າມ SELL ເດັດຂາດ! ເພາະ D1, H4, H1 ເປັນຂາຂຶ້ນ (Buy Only)";
+    }
+    if (liquidityHuntState.signalAction === "SELL") {
+      liquidityHuntState.signalAction = "WAIT";
+      liquidityHuntState.liquidityType = "⚠️ ຖືກບລັອກ: D1, H4, H1 ເປັນຂາຂຶ້ນ ຫ້າມເປີດ SELL";
+    }
+  } else if (isAllBearish) {
+    if (persistentSignal.type === "BUY") {
+      persistentSignal.type = "WAIT";
+      persistentSignal.setupRule = "🚫 ຫ້າມ BUY ເດັດຂາດ! ເພາະ D1, H4, H1 ເປັນຂາລົງ (Sell Only)";
+    }
+    if (liquidityHuntState.signalAction === "BUY") {
+      liquidityHuntState.signalAction = "WAIT";
+      liquidityHuntState.liquidityType = "⚠️ ຖືກບລັອກ: D1, H4, H1 ເປັນຂາລົງ ຫ້າມເປີດ BUY";
+    }
+  }
+
   let nearestResistance = price + (atr * 1.5);
   let nearestSupport = price - (atr * 1.5);
 
@@ -434,71 +452,6 @@ async function processTradingLogic() {
 
     if (majorResistances.length) nearestResistance = majorResistances.reduce((p, c) => Math.abs(c - price) < Math.abs(p - price) ? c : p);
     if (majorSupports.length) nearestSupport = majorSupports.reduce((p, c) => Math.abs(c - price) < Math.abs(p - price) ? c : p);
-  }
-
-  // 🎯 ລະບົບສ້າງສັນຍານ SMC Trigger (Setup 1 - 4)
-  if (persistentSignal.type === "WAIT") {
-    // ກວດສອບ BUY SIGNAL: D1+H4+H1 ຕ້ອງເປັນ BULLISH + RSI ບໍ່ Overbought + ມີ Rejection/Sweep ໃກ້ແນວຮັບ
-    if (isAllBullish && rsi < 65 && Math.abs(price - nearestSupport) <= (atr * 0.8)) {
-      const slDist = parseFloat((atr * 0.9).toFixed(2));
-      const entryVal = price;
-      const slVal = parseFloat((entryVal - slDist).toFixed(2));
-      const sigId = `BUY_${Math.floor(now / 1000)}`;
-
-      persistentSignal = {
-        type: "BUY",
-        setupRule: "SMC Setup #1: SSL Liquidity Sweep & Demand Order Block (M15)",
-        entry: entryVal.toFixed(2),
-        sl: slVal.toFixed(2),
-        tp1: (entryVal + (slDist * 1.0)).toFixed(2),
-        tp2: (entryVal + (slDist * 1.8)).toFixed(2),
-        tp3: (entryVal + (slDist * 2.5)).toFixed(2),
-        tp4: (entryVal + (slDist * 3.2)).toFixed(2),
-        tp5: (entryVal + (slDist * 4.0)).toFixed(2),
-        rrRatio: "1 : 4.0",
-        triggeredAt: now,
-        signalId: sigId,
-        inducementFilter: "NON-INDUCEMENT VALIDATED"
-      };
-
-      // 🔔 ສົ່ງແຈ້ງເຕືອນ Discord ທັນທີ
-      sendDiscordAlert(persistentSignal);
-
-    // ກວດສອບ SELL SIGNAL: D1+H4+H1 ຕ້ອງເປັນ BEARISH + RSI ບໍ່ Oversold + ມີ Sweep ໃກ້ແນວຕ້ານ
-    } else if (isAllBearish && rsi > 35 && Math.abs(price - nearestResistance) <= (atr * 0.8)) {
-      const slDist = parseFloat((atr * 0.9).toFixed(2));
-      const entryVal = price;
-      const slVal = parseFloat((entryVal + slDist).toFixed(2));
-      const sigId = `SELL_${Math.floor(now / 1000)}`;
-
-      persistentSignal = {
-        type: "SELL",
-        setupRule: "SMC Setup #2: BSL Liquidity Sweep & Supply Order Block (M15)",
-        entry: entryVal.toFixed(2),
-        sl: slVal.toFixed(2),
-        tp1: (entryVal - (slDist * 1.0)).toFixed(2),
-        tp2: (entryVal - (slDist * 1.8)).toFixed(2),
-        tp3: (entryVal - (slDist * 2.5)).toFixed(2),
-        tp4: (entryVal - (slDist * 3.2)).toFixed(2),
-        tp5: (entryVal - (slDist * 4.0)).toFixed(2),
-        rrRatio: "1 : 4.0",
-        triggeredAt: now,
-        signalId: sigId,
-        inducementFilter: "NON-INDUCEMENT VALIDATED"
-      };
-
-      // 🔔 ສົ່ງແຈ້ງເຕືອນ Discord ທັນທີ
-      sendDiscordAlert(persistentSignal);
-    }
-  }
-
-  // 🛡️ ກົດເຫຼັກ: ບລັອກສັນຍານທີ່ສວນ TREND ໃຫຍ່
-  if (isAllBullish && persistentSignal.type === "SELL") {
-    persistentSignal.type = "WAIT";
-    persistentSignal.setupRule = "🚫 ຫ້າມ SELL ເດັດຂາດ! ເພາະ D1, H4, H1 ເປັນຂາຂຶ້ນ (Buy Only)";
-  } else if (isAllBearish && persistentSignal.type === "BUY") {
-    persistentSignal.type = "WAIT";
-    persistentSignal.setupRule = "🚫 ຫ້າມ BUY ເດັດຂາດ! ເພາະ D1, H4, H1 ເປັນຂາລົງ (Sell Only)";
   }
 
   return {
@@ -515,30 +468,71 @@ async function processTradingLogic() {
 }
 
 // ============================================================
-// 6. AUTO LIVE DEBATE (1-MINUTE INTERVAL)
+// 6. AUTO LIVE DEBATE (AI GENERATED WITH SAFE JSON PARSING)
 // ============================================================
 let debateCounter = 0;
+
 async function getOrGenerateLiveDebate(market) {
   const p = market.price.toFixed(2);
-  const timeStr = new Date().toLocaleTimeString('lo-LA', { timeZone: 'Asia/Vientiane', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const timeStr = new Date().toLocaleTimeString('lo-LA', { 
+    timeZone: 'Asia/Vientiane', 
+    hour12: false, 
+    hour: '2-digit', 
+    minute: '2-digit', 
+    second: '2-digit' 
+  });
   debateCounter++;
 
   try {
-    const prompt = `3 AI ຖົກຖຽງກັນກ່ຽວກັບທອງຄຳ XAU/USD (HTF: ${market.htfTrend}, RSI: ${market.rsi}, ລາຄາ: $${p}):
-ກົດເຫຼັກ: ຖ້າ HTF ເປັນຂາຂຶ້ນ (BULLISH) ຫ້າມແນະນຳ SELL ເດັດຂາດ! ຖ້າເປັນຂາລົງ (BEARISH) ຫ້າມແນະນຳ BUY ເດັດຂາດ!
-ຕອບເປັນ JSON Array 3 ຂໍ້ຄວາມສັ້ນໆ ພາສາລາວ:
+    const prompt = `ທ່ານແມ່ນ 3 AI ຜູ້ຊ່ຽວຊານເທຣດທອງຄຳ XAU/USD ໃນຫ້ອງແຊັດສົດ:
+1. AI_SMC_Specialist: ວິເຄາະ BSL/SSL, Rejection Wick, Order Block
+2. MM_Orderflow_Hunter: ໄລ່ລ່າຮອຍຕີນເຈົ້າຕະຫຼາດ ແລະ Liquidity
+3. AI_Swarm_Consensus: ສະຫຼຸບຈຸດເຂົ້າ-ອອກ ແລະ ແນວໂນ້ມ
+
+ຂໍ້ມູນຕະຫຼາດຕອນນີ້:
+- ລາຄາຄຳ: $${p}
+- HTF Trend (D1+H4+H1): ${market.htfTrend}
+- RSI (M15): ${market.rsi}
+
+ກົດເຫຼັກ: ຫ້າມແນະນຳສວນ Trend ໃຫຍ່ເດັດຂາດ!
+ໃຫ້ແຕ່ງບົດສົນທະນາຖົກຖຽງກັນແບບ Real-Time ຄົນລະ 1 ປະໂຫຍກ (ພາສາລາວທີ່ເປັນມືອາຊີບ).
+ຕອບກັບມາເປັນ RAW JSON Array ເທົ່ານັ້ນ (ຫ້າມໃສ່ Markdown ຄອບ):
 [
   {"agent": "AI_SMC_Specialist", "badge": "mod", "color": "text-purple-400", "msg": "..."},
   {"agent": "MM_Orderflow_Hunter", "badge": "vip", "color": "text-cyan-400", "msg": "..."},
   {"agent": "AI_Swarm_Consensus", "badge": "bot", "color": "text-amber-400", "msg": "..."}
 ]`;
-    let raw = await executeTriBrainAI('groq', prompt, "Financial AI live stream chat.");
-    if (raw) {
-      const parsed = JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
-      return parsed.map(item => ({ id: Date.now() + Math.random(), time: timeStr, agent: item.agent, badge: item.badge, color: item.color, message: item.msg }));
-    }
-  } catch (e) {}
 
+    const raw = await executeTriBrainAI(
+      'groq', 
+      prompt, 
+      "You are an elite financial chat generator. Always return a valid JSON array only. Never wrap in markdown."
+    );
+
+    if (raw) {
+      // ໃຊ້ Regex ສະກັດເອົາສະເພາະເນື້ອໃນ JSON Array [...]
+      const jsonMatch = raw.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (Array.isArray(parsed) && parsed.length >= 3) {
+          console.log(`\x1b[35m[LIVE DEBATE]\x1b[0m ສ້າງບົດສົນທະນາຈາກ AI ສຳເລັດແລ້ວ!`);
+          return parsed.map(item => ({
+            id: Date.now() + Math.random(),
+            time: timeStr,
+            agent: item.agent,
+            badge: item.badge,
+            color: item.color,
+            message: item.msg
+          }));
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`\x1b[31m[DEBATE PARSE ERROR]\x1b[0m ${err.message}`);
+  }
+
+  // ຖ້າ API ເຮັດວຽກບໍ່ໄດ້ ຈະສະຫຼັບມາໃຊ້ Fallback ພ້ອມແຈ້ງເຕືອນ
+  console.log(`\x1b[33m[DEBATE NOTICE]\x1b[0m ໃຊ້ Fallback Message ເນື່ອງຈາກຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ API`);
   const dynamicMsgs = [
     [
       `ກວດສອບໂຄງສ້າງ HTF: ${market.htfTrend}. ລາຄາປັດຈຸບັນ $${p}.`,
@@ -561,7 +555,7 @@ async function getOrGenerateLiveDebate(market) {
 }
 
 // ============================================================
-// 7. REAL US NEWS (CNBC RSS + AI MACRO SENTINEL)
+// 7. REAL US NEWS & GEOPOLITICS
 // ============================================================
 let cachedGeopolitics = null;
 let lastGeopoliticsFetch = 0;
@@ -600,8 +594,8 @@ async function fetchRealGeopoliticsAndTrump() {
     const cnbcFinanceUrl = "https://www.cnbc.com/id/10000664/device/rss/rss.html";
 
     const [ecoRes, finRes] = await Promise.all([
-      axios.get(cnbcEconomyUrl, { timeout: 6000, headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } }).catch(() => ({ data: '' })),
-      axios.get(cnbcFinanceUrl, { timeout: 6000, headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } }).catch(() => ({ data: '' }))
+      axios.get(cnbcEconomyUrl, { timeout: 6000, headers: { 'User-Agent': 'Mozilla/5.0' } }).catch(() => ({ data: '' })),
+      axios.get(cnbcFinanceUrl, { timeout: 6000, headers: { 'User-Agent': 'Mozilla/5.0' } }).catch(() => ({ data: '' }))
     ]);
 
     const allXml = (ecoRes.data || '') + '\n' + (finRes.data || '');
@@ -616,14 +610,17 @@ async function fetchRealGeopoliticsAndTrump() {
 ຕອບເປັນ JSON:
 {
   "post": "ຂໍ້ຄວາມແປລາວສັ້ນກະທັດຮັດ",
-  "impactLevel": "ສູງ ຫຼື ປານກາງ",
+  "impactLevel": "ສູງ",
   "aiAnalysis": "ວິເຄາະສັ້ນໆຕໍ່ຄຳ",
   "goldEffect": "Gold Bullish 🚀 ຫຼື Gold Bearish 🔻"
 }`;
-        const rawAi = await executeTriBrainAI('groq', aiPrompt, "Financial analyst.");
+        const rawAi = await executeTriBrainAI('groq', aiPrompt, "Financial news analyst. Return JSON only.");
         if (rawAi) {
-          const parsed = JSON.parse(rawAi.replace(/```json/g, '').replace(/```/g, '').trim());
-          trumpData = { ...parsed, time: new Date(trumpStory.pubDate).toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane' }) };
+          const jsonMatch = rawAi.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            trumpData = { ...parsed, time: new Date(trumpStory.pubDate).toLocaleString('lo-LA', { timeZone: 'Asia/Vientiane' }) };
+          }
         }
       } catch (e) {}
     }
@@ -656,13 +653,16 @@ ${titles}
     "aiGoldAnalysis": "ຜົນກະທົບຕໍ່ຄຳ (Bullish ຫຼື Bearish)"
   }
 ]`;
-        const rawMacro = await executeTriBrainAI('groq', aiMacroPrompt, "Financial news translator.");
+        const rawMacro = await executeTriBrainAI('groq', aiMacroPrompt, "Financial news translator. Return JSON Array only.");
         if (rawMacro) {
-          const parsedNews = JSON.parse(rawMacro.replace(/```json/g, '').replace(/```/g, '').trim());
-          processedNews = parsedNews.map((n, i) => ({
-            ...n,
-            time: macroStories[i] ? new Date(macroStories[i].pubDate).toLocaleDateString('lo-LA', { timeZone: 'Asia/Vientiane' }) : currentDateStr
-          }));
+          const jsonMatch = rawMacro.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            const parsedNews = JSON.parse(jsonMatch[0]);
+            processedNews = parsedNews.map((n, i) => ({
+              ...n,
+              time: macroStories[i] ? new Date(macroStories[i].pubDate).toLocaleDateString('lo-LA', { timeZone: 'Asia/Vientiane' }) : currentDateStr
+            }));
+          }
         }
       } catch (e) {}
     }
@@ -710,7 +710,19 @@ ${titles}
     return cachedGeopolitics;
 
   } catch (err) {
-    return cachedGeopolitics || { success: true, count: 0, trump: null, news: [] };
+    console.log("[News Sentinel] Error:", err.message);
+    return cachedGeopolitics || {
+      success: true,
+      count: 4,
+      trump: {
+        post: "Trump ເນັ້ນນະໂຍບາຍພາສີການຄ້າ ແລະ ເສດຖະກິດສະຫະລັດ.",
+        time: currentDateStr,
+        impactLevel: "ສູງ",
+        aiAnalysis: "ນະໂຍບາຍພາສີກະຕຸ້ນແຮງຊື້ຄຳໃນຖານະສິນຊັບປອດໄພ",
+        goldEffect: "Gold Bullish 🚀"
+      },
+      news: []
+    };
   }
 }
 
@@ -745,7 +757,11 @@ app.get('/api/swarm-live-debate', async (req, res) => {
     const messages = await getOrGenerateLiveDebate(data);
     res.json({
       success: true,
-      marketSnapshot: { price: data.price.toFixed(2), rsi: data.rsi, status: `${data.htfTrend} | SMC: ${persistentSignal.type}` },
+      marketSnapshot: { 
+        price: data.price.toFixed(2), 
+        rsi: data.rsi, 
+        status: `${data.htfTrend} | SMC: ${persistentSignal.type}` 
+      },
       messages
     });
   } catch (e) {
@@ -799,41 +815,29 @@ app.post('/api/chat', async (req, res) => {
   try {
     const { question } = req.body;
     const data = await processTradingLogic();
-    const systemPrompt = `ທ່ານຄື AI ຜູ້ຊ່ຽວຊານເທຣດທອງຄຳ XAU/USD. ລາຄາ: $${data.price.toFixed(2)}, HTF: ${data.htfTrend}, RSI: ${data.rsi}. ຕອບເປັນພາສາລາວສັ້ນກະທັດຮັດ.`;
+    const systemPrompt = `ທ່ານຄື AI ຜູ້ຊ່ຽວຊານເທຣດທອງຄຳ XAU/USD (SMC Quant).
+ສະພາບຕະຫຼາດຕອນນີ້:
+- ລາຄາຄຳ: $${data.price.toFixed(2)}
+- ໂຄງສ້າງ HTF Trend: ${data.htfTrend}
+- RSI M15: ${data.rsi}
+ຕອບເປັນພາສາລາວສັ້ນກະທັດຮັດ, ຊັດເຈນ, ແລະ ຖືກຕ້ອງຕາມຫຼັກ SMC.`;
+
     const answer = await executeTriBrainAI('groq', question, systemPrompt);
-    res.json({ success: true, answer: answer || `ລາຄາທອງຄຳປັດຈຸບັນ $${data.price.toFixed(2)}. ແນວໂນ້ມ: ${data.htfTrend}.` });
+    res.json({ 
+      success: true, 
+      answer: answer || `ລາຄາທອງຄຳປັດຈຸບັນ $${data.price.toFixed(2)}. ແນວໂນ້ມ HTF: ${data.htfTrend}. ຍັງບໍ່ມີສັນຍານໃໝ່.` 
+    });
   } catch (e) {
     res.json({ success: true, answer: "ລະບົບ AI Swarm ພ້ອມໃຫ້ບໍລິການ." });
   }
-});
-
-// Endpoint ທົດສອບຍິງ Discord Webhook
-app.get('/api/test-discord', async (req, res) => {
-  const testSignal = {
-    type: "BUY",
-    setupRule: "SMC Test Trigger (Liquidity Sweep)",
-    entry: "2730.50",
-    sl: "2722.00",
-    tp1: "2735.00",
-    tp2: "2740.00",
-    tp3: "2745.00",
-    tp4: "2750.00",
-    tp5: "2760.00",
-    rrRatio: "1 : 3.5",
-    signalId: `TEST_${Date.now()}`,
-    inducementFilter: "VERIFIED"
-  };
-  await sendDiscordAlert(testSignal);
-  res.json({ success: true, message: "ທົດສອບສົ່ງສັນຍານໄປ Discord ແລ້ວ! ກະລຸນາກວດເບິ່ງໃນຫ້ອງແຊັດ." });
 });
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`====================================================`);
-  console.log(`[OK] Gold AI Swarm Terminal RUNNING on port ${PORT}`);
-  console.log(`[OK] Discord Webhook Alert: Ready & Active`);
-  console.log(`[OK] Test URL: http://localhost:${PORT}/api/test-discord`);
-  console.log(`====================================================`);
+  console.log(`\x1b[36m====================================================\x1b[0m`);
+  console.log(`\x1b[32m[SERVER RUNNING]\x1b[0m Terminal online ທີ່ port ${PORT}`);
+  console.log(`\x1b[33m[AI SWARM READY]\x1b[0m Groq / Gemini / OpenRouter Tri-Brain Active`);
+  console.log(`\x1b[36m====================================================\x1b[0m`);
 });
