@@ -3,6 +3,7 @@ const cors = require('cors');
 const axios = require('axios');
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
 const { OpenAI } = require('openai');
 
 dotenv.config();
@@ -12,14 +13,73 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
 // ============================================================
-// ຕັ້ງຄ່າ DISCORD WEBHOOK (ປ່ຽນ URL ຂອງທ່ານທີ່ນີ້)
+// PERSISTENT STORAGE (ບັນທຶກສະຖານະລົງໄຟລ໌ ປ້ອງກັນ Server Restart ແລ້ວຫາຍ)
+// ============================================================
+const STATE_FILE = path.join(__dirname, 'signal_state.json');
+
+let persistentSignal = {
+  type: "WAIT",
+  setupRule: "ກຳລັງຊອກຫາຈຸດ Buy-Sell ໃໝ່...",
+  entry: "--",
+  sl: "--",
+  tp1: "--", tp2: "--", tp3: "--", tp4: "--", tp5: "--",
+  rrRatio: "1 : 3.6",
+  triggeredAt: 0,
+  signalId: null,
+  inducementFilter: "PASSED"
+};
+
+let liquidityHuntState = {
+  isCleared: false,
+  clearedPrice: "--",
+  liquidityType: "Scanning Liquidity Pools...",
+  signalAction: "WAIT",
+  clearedAt: 0
+};
+
+let lastSentSignalId = null;
+
+// โຫຼດຂໍ້ມູນສະຖານະເກົ່າ (ຖ້າມີ)
+function loadPersistentState() {
+  try {
+    if (fs.existsSync(STATE_FILE)) {
+      const rawData = fs.readFileSync(STATE_FILE, 'utf8');
+      const saved = JSON.parse(rawData);
+      if (saved.persistentSignal) persistentSignal = saved.persistentSignal;
+      if (saved.liquidityHuntState) liquidityHuntState = saved.liquidityHuntState;
+      if (saved.lastSentSignalId) lastSentSignalId = saved.lastSentSignalId;
+      console.log("[State] Loaded previous signal state successfully.");
+    }
+  } catch (e) {
+    console.log("[State] Error loading state file:", e.message);
+  }
+}
+
+// บันทึกສະຖານະປັດຈຸບັນ
+function savePersistentState() {
+  try {
+    const dataToSave = {
+      persistentSignal,
+      liquidityHuntState,
+      lastSentSignalId
+    };
+    fs.writeFileSync(STATE_FILE, JSON.stringify(dataToSave, null, 2), 'utf8');
+  } catch (e) {
+    console.log("[State] Error saving state file:", e.message);
+  }
+}
+
+loadPersistentState();
+
+// ============================================================
+// ຕັ້ງຄ່າ DISCORD WEBHOOK
 // ============================================================
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || "ໃສ່_Discord_Webhook_URL_ຂອງທ່ານທີ່ນີ້";
 
 async function sendDiscordAlert(signalType, entryPrice, tp5, sl) {
   if (!DISCORD_WEBHOOK_URL || DISCORD_WEBHOOK_URL.includes("ໃສ່_Discord")) return;
   try {
-    const color = signalType === 'BUY' ? 3066993 : 15158332; // เขียว ຫຼື ແດງ
+    const color = signalType === 'BUY' ? 3066993 : 15158332;
     const payload = {
       embeds: [{
         title: `🚨 ລະບົບແຈ້ງເຕືອນ SMC SIGNAL: ${signalType}`,
@@ -41,13 +101,13 @@ async function sendDiscordAlert(signalType, entryPrice, tp5, sl) {
 // ============================================================
 // ຕັ້ງຄ່າ SMART CACHE
 // ============================================================
-const LIVE_PRICE_CACHE_MS = 150 * 1000;          // 2.5 ນาที
-const D1_CACHE_MS         = 7 * 24 * 3600 * 1000;// 7 ມື້
-const H4_CACHE_MS         = 24 * 3600 * 1000;    // 24 ຊົ່ວໂມງ
-const H1_CACHE_MS         = 24 * 3600 * 1000;    // 24 ຊົ່ວໂມງ
-const M15_CACHE_MS        = 15 * 60 * 1000;      // 15 ນາທີ
-const NEWS_CACHE_MS       = 15 * 60 * 1000;      // 15 ນາທີ
-const SEVEN_DAYS_MS       = 7 * 24 * 3600 * 1000;// 7 ມື້
+const LIVE_PRICE_CACHE_MS = 150 * 1000;          
+const D1_CACHE_MS         = 7 * 24 * 3600 * 1000;
+const H4_CACHE_MS         = 24 * 3600 * 1000;    
+const H1_CACHE_MS         = 24 * 3600 * 1000;    
+const M15_CACHE_MS        = 15 * 60 * 1000;      
+const NEWS_CACHE_MS       = 15 * 60 * 1000;      
+const SEVEN_DAYS_MS       = 7 * 24 * 3600 * 1000;
 
 // ============================================================
 // 1. TRI-BRAIN AI CLIENTS (Groq + Gemini + OpenRouter)
@@ -173,7 +233,7 @@ function getCandleTrend(candles) {
 }
 
 // ============================================================
-// 3. REAL-TIME SPOT GOLD PRICE FEED
+// 3. REAL-TIME SPOT GOLD PRICE FEED (WITH ROBUST FALLBACKS)
 // ============================================================
 let cachedLiveFeed = null;
 let lastLiveFetch = 0;
@@ -332,40 +392,18 @@ function extractFractals(candles) {
 }
 
 // ============================================================
-// 5. TRADING LOGIC & SIGNALS (Cooldown 2 ຊົ່ວໂມງ)
+// 5. TRADING LOGIC & SIGNALS (Cooldown 2 ຊົ່ວໂມງ & Persistent Saving)
 // ============================================================
-let persistentSignal = {
-  type: "WAIT",
-  setupRule: "ກຳລັງຊອກຫາຈຸດ Buy-Sell ໃໝ່...",
-  entry: "--",
-  sl: "--",
-  tp1: "--", tp2: "--", tp3: "--", tp4: "--", tp5: "--",
-  rrRatio: "1 : 3.6",
-  triggeredAt: 0,
-  signalId: null,
-  inducementFilter: "PASSED"
-};
-
-let liquidityHuntState = {
-  isCleared: false,
-  clearedPrice: "--",
-  liquidityType: "Scanning Liquidity Pools...",
-  signalAction: "WAIT",
-  clearedAt: 0
-};
-
-let lastSentSignalId = null; 
-
 async function processTradingLogic() {
   const now = Date.now();
   
-  // ⏳ ຕັ້ງເວລາໃຫ້ສັນຍານຄົງຢູ່ 2 ຊົ່ວໂມງ (`2 * 3600 * 1000`) ກ่อนຈະຣີເຊັດ
   if (persistentSignal.type !== "WAIT" && (now - persistentSignal.triggeredAt > 2 * 3600 * 1000)) {
     persistentSignal = {
       type: "WAIT", setupRule: "ກຳລັງຊອກຫາຈຸດ Buy-Sell ໃໝ່...",
       entry: "--", sl: "--", tp1: "--", tp2: "--", tp3: "--", tp4: "--", tp5: "--",
       rrRatio: "1 : 3.6", triggeredAt: 0, signalId: null, inducementFilter: "PASSED"
     };
+    savePersistentState();
   }
 
   const { d1, h4, h1, m15 } = await getMultiTimeframeCandles();
@@ -397,9 +435,11 @@ async function processTradingLogic() {
   if (isAllBullish && persistentSignal.type === "SELL") {
     persistentSignal.type = "WAIT";
     persistentSignal.setupRule = "🚫 ຫ້າມ SELL ເດັດຂາດ! ເພາະ D1, H4, H1 ເປັນຂາຂຶ້ນ";
+    savePersistentState();
   } else if (isAllBearish && persistentSignal.type === "BUY") {
     persistentSignal.type = "WAIT";
     persistentSignal.setupRule = "🚫 ຫ້າມ BUY ເດັດຂາດ! ເພາະ D1, H4, H1 ເປັນຂາລົງ";
+    savePersistentState();
   }
 
   let nearestResistance = price + (atr * 1.5);
@@ -420,7 +460,7 @@ async function processTradingLogic() {
     const entryPrice = price;
     const slPrice = sigType === "BUY" ? entryPrice - (atr * 1.2) : entryPrice + (atr * 1.2);
     const tpDist = atr * 1.8;
-    const newSignalId = `sig_${Math.floor(now / (2 * 3600 * 1000))}`; // ປ່ຽນ ID ຕາມຮອບ 2 ຊົ່ວໂມງ
+    const newSignalId = `sig_${Math.floor(now / (2 * 3600 * 1000))}`;
 
     persistentSignal = {
       type: sigType,
@@ -446,9 +486,11 @@ async function processTradingLogic() {
       clearedAt: now
     };
 
-    // 🛡️ ປ້ອງກັນການສົ່ງແຈ້ງເຕືອນຊ້ຳໃນຮອບ 2 ຊົ່ວໂມງດຽວກັນ
+    savePersistentState();
+
     if (lastSentSignalId !== newSignalId) {
       lastSentSignalId = newSignalId;
+      savePersistentState();
       await sendDiscordAlert(sigType, entryPrice.toFixed(2), persistentSignal.tp5, persistentSignal.sl);
     }
   }
@@ -467,7 +509,7 @@ async function processTradingLogic() {
 }
 
 // ============================================================
-// 6. AUTO LIVE DEBATE (ພາສາລາວ 100% & ບໍ່ຊ້ຳກັນ)
+// 6. AUTO LIVE DEBATE (ພາສາລາວ 100%)
 // ============================================================
 let debateCounter = 0;
 async function getOrGenerateLiveDebate(market) {
@@ -508,7 +550,7 @@ async function getOrGenerateLiveDebate(market) {
 }
 
 // ============================================================
-// 7. REAL GEOPOLITICS & NEWS
+// 7. REAL GEOPOLITICS & NEWS (AUTO PURGE > 7 ມື້)
 // ============================================================
 let cachedGeopolitics = null;
 let lastGeopoliticsFetch = 0;
@@ -656,15 +698,19 @@ app.get('/api/geopolitics', async (req, res) => {
 });
 
 app.get('/api/red-news', async (req, res) => {
-  const { price } = await getLivePriceFeed();
-  res.json({
-    success: true,
-    count: 2,
-    data: [
-      { id: 1, title: "🔴 Core CPI m/m & y/y", time: "19:30 (ICT)", analysis: `ຄຳກຳລັງທົດສອບເຂດ $${price.toFixed(0)}.` },
-      { id: 2, title: "🔴 Non-Farm Payrolls", time: "20:30 (ICT)", analysis: `ຕິດຕາມຄວາມຜັນຜວນແຮງ.` }
-    ]
-  });
+  try {
+    const { price } = await getLivePriceFeed();
+    res.json({
+      success: true,
+      count: 2,
+      data: [
+        { id: 1, title: "🔴 Core CPI m/m & y/y", time: "19:30 (ICT)", analysis: `ຄຳກຳລັງທົດສອບເຂດ $${price.toFixed(0)}.` },
+        { id: 2, title: "🔴 Non-Farm Payrolls", time: "20:30 (ICT)", analysis: `ຕິດຕາມຄວາມຜັນຜວນແຮງ.` }
+      ]
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 app.post('/api/chat', async (req, res) => {
@@ -686,5 +732,6 @@ app.listen(PORT, () => {
   console.log(`====================================================`);
   console.log(`[OK] Gold AI Swarm Terminal RUNNING on port ${PORT}`);
   console.log(`[OK] Tri-Brain AI & Discord Webhook Integrated`);
+  console.log(`[OK] Persistent State File Storage Enabled`);
   console.log(`====================================================`);
 });
