@@ -774,10 +774,15 @@
                 const res = await fetch(`${API_BASE}/red-news`);
                 const result = await res.json();
                 if (result.success) {
+                    const currentDateStr = new Date().toLocaleDateString('lo-LA', { timeZone: 'Asia/Vientiane', day: '2-digit', month: '2-digit', year: 'numeric' });
+                    
                     document.getElementById('red-news-badge').innerText = result.count;
                     document.getElementById('red-news-grid').innerHTML = result.data.map(item => `
                         <div class="bg-gray-900 border border-gray-800 p-4 rounded-2xl space-y-2">
-                            <div class="flex justify-between text-xs"><span class="bg-blue-600/20 text-blue-400 px-2 py-0.5 rounded">USD</span><span class="text-amber-400 font-mono">${item.time}</span></div>
+                            <div class="flex justify-between text-xs">
+                                <span class="bg-blue-600/20 text-blue-400 px-2 py-0.5 rounded">USD</span>
+                                <span class="text-amber-400 font-mono">${currentDateStr} | ${item.time}</span>
+                            </div>
                             <h3 class="text-sm font-bold text-gray-100">${item.title}</h3>
                             <div>${item.analysis}</div>
                         </div>
