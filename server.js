@@ -123,36 +123,52 @@ function calculateATR(candles, period = 14) {
 }
 
 // ============================================================
-// 3. REAL-TIME GOLD PRICE FEED (Multi-Source Global Feed)
+// 3. REAL-TIME GOLD PRICE FEED (Twelve Data + Smart Cache)
 // ============================================================
 let cachedLiveFeed = null;
 let lastLiveFetch = 0;
 
 async function getLivePriceFeed() {
   const now = Date.now();
-  if (cachedLiveFeed && (now - lastLiveFetch < 2000) && cachedLiveFeed.price > 1000) {
+  // Cache ລາຄາໄວ້ 10 ວິນາທີ ເພື່ອບໍ່ໃຫ້ເກີນໂກຕາ 8 calls/min ຂອງ Twelve Data
+  if (cachedLiveFeed && (now - lastLiveFetch < 10000) && cachedLiveFeed.price > 1000) {
     return cachedLiveFeed;
   }
 
   let price = null;
-  let rsi = 50.0;
-  let atr = 14.0;
+  let rsi = cachedLiveFeed?.rsi || 50.0;
+  let atr = cachedLiveFeed?.atr || 14.0;
 
-  // ແຫຼ່ງທີ 1: GoldPrice.org (Live Spot Gold XAU/USD ບໍ່ມີການບລັອກ IP ທົ່ວໂລກ)
-  try {
-    const gpRes = await axios.get('https://data-asg.goldprice.org/dbXRates/USD', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'application/json'
-      },
-      timeout: 3000
-    });
-    if (gpRes.data?.items?.[0]?.xauPrice) {
-      price = parseFloat(gpRes.data.items[0].xauPrice.toFixed(2));
+  // ⭐️ ແຫຼ່ງທີ 1: TWELVE DATA API (Spot Gold XAU/USD ແທ້ໆຄືກັບ TradingView)
+  const tdKey = (process.env.TWELVE_DATA_API_KEY || "").trim();
+  if (tdKey) {
+    try {
+      const tdRes = await axios.get(`https://api.twelvedata.com/price?symbol=XAU/USD&apikey=${tdKey}`, { timeout: 4000 });
+      if (tdRes.data && tdRes.data.price && !isNaN(parseFloat(tdRes.data.price))) {
+        price = parseFloat(parseFloat(tdRes.data.price).toFixed(2));
+      }
+    } catch (e) {
+      console.log("[TwelveData] Request Error:", e.message);
     }
-  } catch (e) {}
+  }
 
-  // ແຫຼ່ງທີ 2: Yahoo Finance GC=F (ດຶງລາຄາ Live ທອງຄຳ ແລະ ແທ່ງທຽນມາຄຳນວນ RSI/ATR ແທ້)
+  // ແຫຼ່ງທີ 2: GoldPrice.org (Spot Gold ທົ່ວໂລກ)
+  if (!price || price < 1500) {
+    try {
+      const gpRes = await axios.get('https://data-asg.goldprice.org/dbXRates/USD', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'application/json'
+        },
+        timeout: 3000
+      });
+      if (gpRes.data?.items?.[0]?.xauPrice) {
+        price = parseFloat(gpRes.data.items[0].xauPrice.toFixed(2));
+      }
+    } catch (e) {}
+  }
+
+  // ແຫຼ່ງທີ 3: Yahoo Finance (ດຶງແທ່ງທຽນມາຄິດໄລ່ RSI & ATR)
   try {
     const yRes = await axios.get('https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=15m&range=2d', {
       headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -160,15 +176,16 @@ async function getLivePriceFeed() {
     });
     const result = yRes.data?.chart?.result?.[0];
     if (result) {
-      const liveP = result.meta?.regularMarketPrice;
-      if (liveP && !price) price = parseFloat(liveP.toFixed(2));
+      if (!price) {
+        const liveP = result.meta?.regularMarketPrice;
+        if (liveP) price = parseFloat(liveP.toFixed(2));
+      }
 
       const quotes = result.indicators?.quote?.[0];
       if (quotes?.close?.length) {
         const validCloses = quotes.close.filter(c => c !== null && !isNaN(c));
         if (validCloses.length > 15) {
           rsi = calculateRSI(validCloses);
-          if (!price) price = parseFloat(validCloses[validCloses.length - 1].toFixed(2));
         }
 
         const validCandles = [];
@@ -189,16 +206,7 @@ async function getLivePriceFeed() {
     }
   } catch (e) {}
 
-  // ແຫຼ່ງທີ 3: Kraken Spot PAXG/USD
-  if (!price || price < 1500) {
-    try {
-      const kRes = await axios.get('https://api.kraken.com/0/public/Ticker?pair=PAXGUSD', { timeout: 3000 });
-      const lastP = kRes.data?.result?.PAXGUSD?.c?.[0];
-      if (lastP) price = parseFloat(parseFloat(lastP).toFixed(2));
-    } catch (e) {}
-  }
-
-  // ແຫຼ່ງທີ 4: CoinGecko Spot Gold
+  // ແຫຼ່ງທີ 4: Fallback Pax Gold (CoinGecko / Kraken)
   if (!price || price < 1500) {
     try {
       const cgRes = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=pax-gold&vs_currencies=usd', { timeout: 3000 });
@@ -212,7 +220,7 @@ async function getLivePriceFeed() {
     cachedLiveFeed = { price, rsi, atr };
     lastLiveFetch = now;
   } else if (!cachedLiveFeed) {
-    cachedLiveFeed = { price: 2900.00, rsi: 50.0, atr: 14.0 };
+    cachedLiveFeed = { price: 2700.00, rsi: 50.0, atr: 14.0 };
   }
 
   return cachedLiveFeed;
@@ -225,7 +233,6 @@ let cacheH1 = { data: [], lastFetch: 0 };
 let cacheM15 = { data: [], lastFetch: 0 };
 
 async function fetchCandles(interval, count) {
-  // ດຶງຜ່ານ Yahoo Finance GC=F
   try {
     const yahooIntervalMap = { '1day': '1d', '4h': '1h', '1h': '1h', '15min': '15m' };
     const yInt = yahooIntervalMap[interval] || '15m';
@@ -253,7 +260,6 @@ async function fetchCandles(interval, count) {
     }
   } catch (e) {}
 
-  // Fallback ດ້ວຍ Binance PAXGUSDT
   try {
     const binanceIntervalMap = { '1day': '1d', '4h': '4h', '1h': '1h', '15min': '15m' };
     const bInterval = binanceIntervalMap[interval] || '15m';
@@ -426,7 +432,9 @@ async function getOrGenerateLiveDebate(market) {
   ];
 }
 
-// Endpoints
+// ============================================================
+// 4. API ENDPOINTS
+// ============================================================
 app.get('/api/analysis', async (req, res) => {
   try {
     const data = await processTradingLogic();
@@ -529,7 +537,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`====================================================`);
   console.log(`[OK] Gold AI Swarm Terminal RUNNING on port ${PORT}`);
-  console.log(`[OK] Live Spot Gold Price 100% Synced (GoldPrice / Yahoo)`);
+  console.log(`[OK] Live Spot Gold (Twelve Data + Smart Cache 10s)`);
   console.log(`[OK] Debate Interval: 1 Minute per round`);
   console.log(`====================================================`);
 });
