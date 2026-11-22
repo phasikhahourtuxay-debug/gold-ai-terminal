@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: ai-gold-precision-v38
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: python server.py
+    envVars:
+      - key: TWELVEDATA_API_KEY
+        sync: false
+      - key: MARKET_SYMBOL
+        value: XAU/USD
+      - key: GOLD_POINT
+        value: "0.01"
+      - key: MARKET_POLL_SECONDS
+        value: "30"
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
